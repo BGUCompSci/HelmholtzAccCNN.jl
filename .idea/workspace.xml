@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="3861e641-cd11-4177-afa1-318fc4e35d06" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/.idea/HelmholtzAccCNN.jl.iml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/deployment.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/multigrid/flux_components.jl" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/multigrid/helmholtz_methods.jl" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/multigrid/laplacian_methods.jl" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test/multigrid_helmholtz/.ipynb_checkpoints/ShiftedLaplacianHelmholtzTest-checkpoint.ipynb" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test/multigrid_helmholtz/.ipynb_checkpoints/shifted_laplacian_helmholtz_test-checkpoint.ipynb" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test/multigrid_helmholtz/Residual Graph.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test/multigrid_helmholtz/V-Cycle Shifted Laplacian Helmholtz.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test/multigrid_helmholtz/shifted_laplacian_helmholtz_test.ipynb" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test/multigrid_helmholtz/shifted_laplacian_helmholtz_test.jl" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test/multigrid_laplacian/.ipynb_checkpoints/LaplacianTest-checkpoint.ipynb" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test/multigrid_laplacian/.ipynb_checkpoints/laplacian_test-checkpoint.ipynb" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test/multigrid_laplacian/Jacobi Result.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test/multigrid_laplacian/Residual Graph.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test/multigrid_laplacian/V-Cycle Result.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test/multigrid_laplacian/laplacian_test.ipynb" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test/multigrid_laplacian/laplacian_test.jl" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test/runtests.jl" afterDir="false" />
+    </list>
+    <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectFrameBounds" extendedState="1">
+    <option name="x" value="469" />
+    <option name="width" value="1172" />
+    <option name="height" value="1047" />
+  </component>
+  <component name="ProjectView">
+    <navigator proportions="" version="1">
+      <foldersAlwaysOnTop value="true" />
+    </navigator>
+    <panes>
+      <pane id="Scope" />
+      <pane id="ProjectPane" />
+    </panes>
+  </component>
+  <component name="PropertiesComponent">
+    <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
+    <property name="WebServerToolWindowFactoryState" value="true" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
+    <property name="nodejs_npm_path_reset_for_default_project" value="true" />
+  </component>
+  <component name="RunDashboard">
+    <option name="ruleStates">
+      <list>
+        <RuleState>
+          <option name="name" value="ConfigurationTypeDashboardGroupingRule" />
+        </RuleState>
+        <RuleState>
+          <option name="name" value="StatusDashboardGroupingRule" />
+        </RuleState>
+      </list>
+    </option>
+  </component>
+  <component name="SvnConfiguration">
+    <configuration />
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="3861e641-cd11-4177-afa1-318fc4e35d06" name="Default Changelist" comment="" />
+      <created>1598725775091</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1598725775091</updated>
+      <workItem from="1598725776345" duration="611000" />
+      <workItem from="1598783188798" duration="649000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TimeTrackingManager">
+    <option name="totallyTimeSpent" value="1260000" />
+  </component>
+  <component name="ToolWindowManager">
+    <frame x="469" y="0" width="1172" height="1047" extended-state="0" />
+    <layout>
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.2544964" />
+      <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
+      <window_info id="Favorites" order="2" side_tool="true" />
+      <window_info anchor="bottom" id="Message" order="0" />
+      <window_info anchor="bottom" id="Find" order="1" />
+      <window_info anchor="bottom" id="Run" order="2" />
+      <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
+      <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
+      <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
+      <window_info anchor="bottom" id="TODO" order="6" />
+      <window_info anchor="bottom" id="Docker" order="7" show_stripe_button="false" />
+      <window_info anchor="bottom" id="Version Control" order="8" />
+      <window_info anchor="bottom" id="Database Changes" order="9" />
+      <window_info anchor="bottom" id="Event Log" order="10" side_tool="true" />
+      <window_info active="true" anchor="bottom" id="Terminal" order="11" visible="true" weight="0.32932165" />
+      <window_info anchor="bottom" id="Python Console" order="12" />
+      <window_info anchor="right" id="Commander" internal_type="SLIDING" order="0" type="SLIDING" weight="0.4" />
+      <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
+      <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
+      <window_info anchor="right" id="Remote Host" order="3" />
+      <window_info anchor="right" id="SciView" order="4" />
+      <window_info anchor="right" id="Database" order="5" />
+    </layout>
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="1" />
+  </component>
+</project>
