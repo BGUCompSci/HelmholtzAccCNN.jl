@@ -2,29 +2,25 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="3861e641-cd11-4177-afa1-318fc4e35d06" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/HelmholtzAccCNN.jl.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/deployment.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/multigrid/flux_components.jl" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/multigrid/helmholtz_methods.jl" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/multigrid/laplacian_methods.jl" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/test/multigrid_helmholtz/.ipynb_checkpoints/ShiftedLaplacianHelmholtzTest-checkpoint.ipynb" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/test/multigrid_helmholtz/.ipynb_checkpoints/shifted_laplacian_helmholtz_test-checkpoint.ipynb" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/test/multigrid_helmholtz/Residual Graph.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/test/multigrid_helmholtz/V-Cycle Shifted Laplacian Helmholtz.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/test/multigrid_helmholtz/shifted_laplacian_helmholtz_test.ipynb" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/test/multigrid_helmholtz/shifted_laplacian_helmholtz_test.jl" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/test/multigrid_laplacian/.ipynb_checkpoints/LaplacianTest-checkpoint.ipynb" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/test/multigrid_laplacian/.ipynb_checkpoints/laplacian_test-checkpoint.ipynb" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/test/multigrid_laplacian/Jacobi Result.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/test/multigrid_laplacian/Residual Graph.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/test/multigrid_laplacian/V-Cycle Result.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/test/multigrid_laplacian/laplacian_test.ipynb" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/test/multigrid_laplacian/laplacian_test.jl" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/test/runtests.jl" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test/multigrid_helmholtz/results/f=10 gamma_val=1_0e-5 residual graph.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test/multigrid_helmholtz/results/f=10 gamma_val=1_0e-5 result.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test/multigrid_helmholtz/results/f=1_0e-5 gamma_val=1_0e-5 residual graph.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test/multigrid_helmholtz/results/f=1_0e-5 gamma_val=1_0e-5 result.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test/multigrid_helmholtz/results/f=40 gamma_val=0_05 residual graph.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test/multigrid_helmholtz/results/f=40 gamma_val=1_0e-5 residual graph.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test/multigrid_helmholtz/results/f=40 gamma_val=1_0e-5 result.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test/multigrid_helmholtz/results/f=40 gamma_val=30 residual graph.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test/multigrid_helmholtz/results/f=40 gamma_val=30 result.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/multigrid/flux_components.jl" beforeDir="false" afterPath="$PROJECT_DIR$/src/multigrid/flux_components.jl" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/multigrid/helmholtz_methods.jl" beforeDir="false" afterPath="$PROJECT_DIR$/src/multigrid/helmholtz_methods.jl" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test/multigrid_helmholtz/Residual Graph.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/test/multigrid_helmholtz/V-Cycle Shifted Laplacian Helmholtz.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/test/multigrid_helmholtz/shifted_laplacian_helmholtz_test.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/test/multigrid_helmholtz/shifted_laplacian_helmholtz_test.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test/multigrid_helmholtz/shifted_laplacian_helmholtz_test.jl" beforeDir="false" afterPath="$PROJECT_DIR$/test/multigrid_helmholtz/shifted_laplacian_helmholtz_test.jl" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test/multigrid_laplacian/Jacobi Result.png" beforeDir="false" afterPath="$PROJECT_DIR$/test/multigrid_laplacian/results/Jacobi Result.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test/multigrid_laplacian/Residual Graph.png" beforeDir="false" afterPath="$PROJECT_DIR$/test/multigrid_laplacian/results/Residual Graph.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test/multigrid_laplacian/V-Cycle Result.png" beforeDir="false" afterPath="$PROJECT_DIR$/test/multigrid_laplacian/results/V-Cycle Result.png" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -45,8 +41,8 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
-      <pane id="Scope" />
       <pane id="ProjectPane" />
+      <pane id="Scope" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -80,16 +76,18 @@
       <updated>1598725775091</updated>
       <workItem from="1598725776345" duration="611000" />
       <workItem from="1598783188798" duration="649000" />
+      <workItem from="1598903617730" duration="693000" />
+      <workItem from="1600693171069" duration="674000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="1260000" />
+    <option name="totallyTimeSpent" value="2627000" />
   </component>
   <component name="ToolWindowManager">
-    <frame x="469" y="0" width="1172" height="1047" extended-state="0" />
+    <frame x="469" y="0" width="1172" height="1047" extended-state="1" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.2544964" />
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.26348922" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Favorites" order="2" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />

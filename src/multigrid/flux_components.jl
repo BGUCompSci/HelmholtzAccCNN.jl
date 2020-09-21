@@ -14,8 +14,8 @@ function laplacian_conv!(grid; h= 1)
 end
 
 function helmholtz_chain!(grid, matrix; h= 1)
-    filter = reshape((-1.0 / (h^2)) * laplacian_filter,3,3,1,1)
+    filter = reshape((1.0 / (h^2)) * laplacian_filter,3,3,1,1)
     conv = Conv(filter, [0.0], pad=(1,1))
-    chain = Chain(x -> conv(x) .+ matrix .* x)
+    chain = Chain(x -> conv(x) .- (matrix .* x))
     return chain(grid)
 end
