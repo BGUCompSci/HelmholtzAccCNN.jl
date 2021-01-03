@@ -97,7 +97,4 @@ show_last_residual = 0
 if show_last_residual == 1
     last_res = helmholtz_chain!(reshape(x, n-1, n-1, 1, 1), helmholtz_matrix; h=h)
     heatmap(real(last_res[:,:,1,1] - b), color=:grays)
-    t = last_res[:,:,1,1]
-    t[src[1],src[2]] = 1
-    heatmap(real(t), color=:grays)
 end

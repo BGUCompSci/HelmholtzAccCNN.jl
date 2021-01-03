@@ -51,7 +51,7 @@ for i = 1:iterations
 end
 
 heatmap(x_matrix[:,:,1,1], color=:greys, yflip=true)
-savefig("test/multigrid_laplacian/V-Cycle Result")
+savefig("test/multigrid_laplacian/results/V-Cycle Result")
 
 # Jacobi
 
@@ -71,7 +71,7 @@ for i = 1:iterations
 end
 
 heatmap(x_matrix[:,:,1,1], color=:greys, yflip=true)
-savefig("test/multigrid_laplacian/Jacobi Result")
+savefig("test/multigrid_laplacian/results/Jacobi Result")
 
 iter = range(1, length=iterations, jacobi_iterations)
 p = plot(iter,residual[:,1],label="V cycle")
@@ -79,4 +79,4 @@ plot!(iter,residual[:,2],label="Jacobi")
 yaxis!("|| Error ||", :log10)
 xlabel!("Iterations")
 title!("Comperation between V Cycle and Jacobi")
-savefig("test/multigrid_laplacian/Residual Graph")
+savefig("test/multigrid_laplacian/results/Residual Graph")

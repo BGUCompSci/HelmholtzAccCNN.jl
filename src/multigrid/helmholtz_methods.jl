@@ -1,4 +1,4 @@
-include("flux_components.jl");
+include("../flux_components.jl");
 
 # Multigrid Helmholtz Shifted Laplacian Methods
 
