@@ -6,13 +6,25 @@ using LaTeXStrings
 using KrylovMethods
 using Distributions: Normal
 using Plots
-using Augmentor
 using CSV, DataFrames
-pyplot()
+using Dates
+using Random
+
+use_gpu = false
+if use_gpu == true
+    using CUDA
+    #CUDA.allowscalar(false)
+    cgpu = gpu
+else
+    cgpu = cpu
+    pyplot()
+end
 
 include("../../src/multigrid/helmholtz_methods.jl")
 include("../../src/unet/model.jl")
 include("../../src/unet/data.jl")
+include("../../src/unet/train.jl")
+include("../../src/kappa_models.jl")
 
 # Grid
 
@@ -33,131 +45,74 @@ gamma = gamma_val*2*pi * ones(ComplexF64,size(kappa));
 pad_cells = [10;10]
 gamma = absorbing_layer!(gamma, pad_cells, omega);
 
-shifted_laplacian_matrix, helmholtz_matrix = get_helmholtz_matrices!(kappa, omega, gamma; alpha=0.5)
+# Test Network Parameters
 
-# Network Parameters
+e_vcycle_input = true
+data_augmentetion = true
+cifar_kappa = true
+kappa_input = true
+kappa_smooth = true
+models_count = 50000
+gamma_input = false
+random_batch = false
+kernel = (5,5)
+resnet = false
 
-#test_name = "UnetConv and Free Down Up"
-#test_name = "UnetConv and Weighted Down Up"
-#test_name = "ResidualConv and Free Down Up"
-#test_name = "ResidualConv and Weighted Down Up"
-test_name = "Only Residual Input 100"
-generate_e_vcycle = false
 lr = 0.001
-opt = ADAM(lr)
-iterations = 2
-
+opt = ADAM(lr)#), (0.9, 0.8))
+iterations = 3
+v2_iter = 10
+level = 3
 # Generate Data
 
-train_size = 50
-test_size = 5
-batch_size = 10
-train_set = generate_random_data!(train_size, n, kappa, omega, gamma; generate_e_vcycle=generate_e_vcycle)
-test_set = generate_random_data!(test_size, n, kappa, omega, gamma; generate_e_vcycle=generate_e_vcycle)
+train_size = 100
+test_size = 10
+batch_size = 5
 
-# UNet
+test_name = replace("resnet=$(resnet) kernel=$(kernel[1]) random_batch=$(random_batch) gamma_input=$(gamma_input) models_count=$(models_count) cifar=$(cifar_kappa) e_vcycle=$(e_vcycle_input) n=$(n) m=$(train_size) bs=$(batch_size) opt=$(SubString("$(opt)",1,findfirst("(", "$(opt)")[1]-1)) lr=$(lr) iter=$(iterations)","."=>"_")
 
-function loss!(input, output)
-    model_result = model(input)
-    return (sum((output - model_result).^2)) / (sum(output.^2))
-end
+model, train_loss, test_loss = train_residual_unet!(test_name, n, kappa, omega, gamma,
+                                                    train_size, test_size, batch_size, iterations, opt;
+                                                    e_vcycle_input=e_vcycle_input, v2_iter=v2_iter, level=level, data_augmentetion=data_augmentetion, cifar_kappa=cifar_kappa,
+                                                    kappa_input=kappa_input, gamma_input=gamma_input, random_batch=random_batch, kernel=kernel)
 
-function loss!(tuple)
-    return loss!(tuple[1],tuple[2])
-end
-
-if generate_e_vcycle == true
-    model = SUnet(4,2)
-else
-    model = SUnet(2)
-end
-
-batchs = Int64(train_size / batch_size)
-test_loss = zeros(iterations, test_size)
-train_loss = zeros(iterations, train_size)
-
-for iteration in 1:iterations
-    for epoch_idx in 1:batchs
-        epoch_set = train_set[(epoch_idx-1)*batch_size+1:epoch_idx*batch_size]
-        Flux.train!(loss!, Flux.params(model), epoch_set, opt);
-        println(batchs*(iteration-1)+epoch_idx)
-    end
-    test_loss[iteration,:] = loss!.(test_set)
-    train_loss[iteration,:] = loss!.(train_set)
-    println("$(batchs*iteration)) Train loss value = $(mean(train_loss[iteration,:])), Test loss value = $(mean(test_loss[iteration,:]))")
-end
-
-iter = range(1, batchs*iterations, length = iterations)
-p = plot(iter, mean(train_loss,dims=2), label="Train")
-plot!(iter, mean(test_loss,dims=2), label="Test")
+iter = range(1, length =iterations+1)
+p = plot(iter, train_loss, label="Train residual")
+plot!(iter, test_loss, label="Test residual")
 yaxis!("Loss", :log10)
 xlabel!("Iterations")
-savefig(replace("test/unet_helmholtz/results/$(test_name) Residual Graph","."=>"_"))
-
-index = 3
-
-# Train Check
-
-e_true = train_set[index][2]
-if generate_e_vcycle == true
-    e_vcycle = train_set[index][1][:,:,1:2,:]
-    r = train_set[index][1][:,:,3:4,:]
-else
-    r = train_set[index][1]
-end
-
-model_result = model(train_set[index][1])
-
-heatmap(e_true[:,:,1,1], color=:grays)
-title!(L"e^{true} = x - \tilde x")
-savefig("test/unet_helmholtz/results/$(test_name) Train e_true")
-
-heatmap(r[:,:,1,1], color=:grays)
-title!(L"r = b^{true} - A \tilde x")
-savefig("test/unet_helmholtz/results/$(test_name) Train r")
-
-if generate_e_vcycle == true
-    heatmap(real(e_vcycle[:,:,1,1]), color=:grays)
-    title!(L"e^{vcycle} = Vcycle(A,r,e^{(0)}=0)")
-    savefig("test/unet_helmholtz/results/$(test_name) Train e_vcycle")
-    println("V-Cycle train error norm = $((sum((e_vcycle - e_true).^2))/ (sum(e_true.^2))), UNet train error norm = $((sum((model_result - e_true).^2))/ (sum(e_true.^2)))")
-else
-    println("UNet train error norm = $((sum((model_result - e_true).^2))/ (sum(e_true.^2)))")
-end
-
-heatmap(model_result[:,:,1,1], color=:grays)
-title!(L"e^{net} = UNet(r)")
-savefig("test/unet_helmholtz/results/$(test_name) Train e_unet")
+savefig("test/unet_helmholtz/results/$(test_name) residual graph")
 
 # Test Check
 
-e_true = test_set[index][2]
-if generate_e_vcycle == true
-    e_vcycle = test_set[index][1][:,:,1:2,:]
-    r = test_set[index][1][:,:,3:4,:]
+(input,e_true) = generate_random_data!(1, n, kappa, omega, gamma; generate_e_vcycle=generate_e_vcycle)[1]
+input = train_set[index][1]
+e_vcycle = input[:,:,1:2,:]
+r = input[:,:,end-1:end,:]
+if gamma_input==true
+    input = cat(input, complex_grid_to_channels!(gamma, n), dims=3)
+end
+input |> cgpu
+model_result = model(input)
+model_result = model_result|>cpu
+
+# heatmap(e_true[:,:,1,1], color=:grays)
+# title!(L"e^{true} = x - \tilde x")
+# savefig("test/unet_helmholtz/results/$(test_name) train e_true")
+#
+# heatmap(r[:,:,1,1], color=:grays)
+# title!(L"r = b^{true} - A \tilde x")
+# savefig("test/unet_helmholtz/results/$(test_name) train r")
+
+if e_vcycle_input == true
+    # heatmap(real(e_vcycle[:,:,1,1]), color=:grays)
+    # title!(L"e^{vcycle} = Vcycle(A,r,e^{(0)}=0)")
+    # savefig("test/unet_helmholtz/results/$(test_name) train e_vcycle")
+    @info "$(Dates.format(now(), "HH:MM:SS")) - V-Cycle train error norm = $(norm_diff!(e_vcycle, e_true)), UNet train error norm = $(norm_diff!(model_result, e_true))"
 else
-    r = test_set[index][1]
+    @info "$(Dates.format(now(), "HH:MM:SS")) - UNet train error norm = $(norm_diff!(model_result, e_true))"
 end
 
-model_result = model(test_set[index][1])
-
-heatmap(e_true[:,:,1,1], color=:grays)
-title!(L"e^{true} = x - \tilde x")
-savefig("test/unet_helmholtz/results/$(test_name) Test e_true")
-
-heatmap(r[:,:,1,1], color=:grays)
-title!(L"r = b^{true} - A \tilde x")
-savefig("test/unet_helmholtz/results/$(test_name) Test r")
-
-if generate_e_vcycle == true
-    heatmap(real(e_vcycle[:,:,1,1]), color=:grays)
-    title!(L"e^{vcycle} = Vcycle(A,r,e^{(0)}=0)")
-    savefig("test/unet_helmholtz/results/$(test_name) Test e_vcycle")
-    println("V-Cycle test error norm = $((sum((e_vcycle - e_true).^2))/ (sum(e_true.^2))), UNet train error norm = $((sum((model_result - e_true).^2))/ (sum(e_true.^2)))")
-else
-    println("UNet test error norm = $((sum((model_result - e_true).^2))/ (sum(e_true.^2)))")
-end
-
-heatmap(model_result[:,:,1,1], color=:grays)
-title!(L"e^{net} = UNet(r)")
-savefig("test/unet_helmholtz/results/$(test_name) Test e_unet")
+# heatmap(model_result[:,:,1,1], color=:grays)
+# title!(L"e^{net} = UNet(r)")
+# savefig("test/unet_helmholtz/results/$(test_name) train e_unet")

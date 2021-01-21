@@ -1,21 +1,22 @@
 include("../../src/unet/utils.jl")
 
 function BatchNormWrap(out_ch)
-    Chain(x->expand_dims(x,2),
-    BatchNorm(out_ch),
-	x->squeeze(x))
+    Chain(x->expand_dims(x,2)|>cgpu,
+	  BatchNorm(out_ch)|> cgpu,
+	  x->squeeze(x))|> cgpu
 end
 
-UNetConvBlock(in_chs, out_chs, kernel = (3, 3)) =
-    Chain(Conv(kernel, in_chs=>out_chs,pad = 1;init=_random_normal),
-	    BatchNorm(out_chs),
-	    x->elu.(x,0.2f0))
+UNetConvBlock(in_chs, out_chs; kernel = (3, 3)) =
+    Chain(Conv(kernel, in_chs=>out_chs, pad=2;init=_random_normal),
+	BatchNorm(out_chs),
+	x->elu.(x,0.2f0))|> cgpu
 
 ConvDown(in_chs,out_chs,kernel = (5,5)) =
-    Chain(# Conv(block_filter!(3, smooth_down_filter, in_chs), [0.0], stride=(2,2)),
-        Conv(kernel, in_chs=>out_chs, stride=(2,2), pad=(1,1); init=_random_normal),
-	    BatchNorm(out_chs),
-	    x->elu.(x,0.2f0))
+  Chain(
+    #Conv(block_filter!(3, smooth_down_filter, in_chs), [0.0], stride=(2,2)),
+    Conv(kernel,in_chs=>out_chs,stride=(2,2), pad = 1;init=_random_normal),
+	BatchNorm(out_chs),
+	x->elu.(x,0.2f0))|> cgpu
 
 struct UNetUpBlock
   upsample
@@ -27,11 +28,11 @@ end
 
 UNetUpBlock(in_chs::Int, out_chs::Int; kernel = (5, 5), p = 0.5f0) =
     UNetUpBlock(Chain(x->elu.(x,0.2f0),
-                    # ConvTranspose(block_filter!(3, smooth_up_filter, in_chs), [0.0], stride=(2,2)),
-                    # ConvTranspose((1, 1),in_chs=>out_chs;init=_random_normal),
-                    ConvTranspose(kernel, in_chs=>out_chs, stride=(2, 2), pad = (1,1);init=_random_normal),
-                    BatchNorm(out_chs),
-        		    Dropout(p)))
+                #ConvTranspose(block_filter!(3, smooth_up_filter, in_chs), [0.0], stride=(2,2)),
+                #ConvTranspose((1, 1),in_chs=>out_chs;init=_random_normal),
+                ConvTranspose(kernel, in_chs=>out_chs, stride=(2, 2), pad = 1;init=_random_normal),
+                BatchNorm(out_chs),
+        		Dropout(p)))|> cgpu
 
 struct ResidualBlock
   layers
@@ -41,14 +42,16 @@ end
 
 (r::ResidualBlock)(input) = r.bn(r.layers(input) + r.shortcut(input))
 
+@functor ResidualBlock
+
 function ResidualBlock(in_chs::Int, out_chs::Int; kernel = (3, 3))
-    layers = Chain(Conv(kernel, in_chs=>out_chs, pad = (1, 1); init=_random_normal),
+    layers = Chain(Conv(kernel, in_chs=>out_chs,pad = (1, 1);init=_random_normal),
                 	BatchNorm(out_chs),
                 	x->elu.(x,0.2f0),
-                    Conv(kernel, out_chs=>out_chs, pad = (1, 1); init=_random_normal))
-    shortcut = Conv((1,1), in_chs=>out_chs)
-    bn = BatchNormWrap(out_chs)
-    ResidualBlock(layers, shortcut, bn)
+                    Conv(kernel, out_chs=>out_chs,pad = (1, 1);init=_random_normal))|> cgpu
+    shortcut = Conv((1,1),in_chs=>out_chs)|> cgpu
+    bn = BatchNorm(out_chs)|> cgpu
+    ResidualBlock(layers, shortcut, bn)|> cgpu
 end
 
 struct SUnet
@@ -59,23 +62,22 @@ end
 
 @functor SUnet
 
-function SUnet(channels::Int = 2, labels::Int = channels)
+function SUnet(channels::Int = 2, labels::Int = channels; kernel = (3, 3))
   conv_down_blocks = Chain(ConvDown(16,16),
 		      ConvDown(32,32),
 		      ConvDown(64,64),
-		      ConvDown(128,128))
+		      ConvDown(128,128))|> cgpu
 
-  conv_blocks = Chain(UNetConvBlock(channels, 8),
-		 UNetConvBlock(8, 32),
-		 UNetConvBlock(32, 64),
-		 UNetConvBlock(64, 128),
-		 UNetConvBlock(128, 128))
+  conv_blocks = Chain(UNetConvBlock(channels, 8; kernel = kernel),
+		 UNetConvBlock(8, 32; kernel = kernel),
+		 UNetConvBlock(32, 64; kernel = kernel),
+		 UNetConvBlock(64, 128; kernel = kernel),
+		 UNetConvBlock(128, 128; kernel = kernel))|> cgpu
 
   up_blocks = Chain(UNetUpBlock(128, 64),
 		UNetUpBlock(128, 32),
 		Chain(x->elu.(x,0.2f0),
-		Conv((1, 1), 64=>labels;init=_random_normal)))
-
+		Conv((1, 1), 64=>labels;init=_random_normal)))|> cgpu
   SUnet(conv_down_blocks, conv_blocks, up_blocks)
 end
 
@@ -109,4 +111,18 @@ function Base.show(io::IO, u::SUnet)
     println(io, "  UpBlock: 15 X 15 X 128 X 1 -> 31 X 31 X 128 X 1")
     println(io, "  UpBlock: 31 X 31 X 128 X 1 -> 63 X 63 X 64 X 1")
     println(io, "  Conv: 63 X 63 X 64 X 1 -> 63 X 63 X 2 X 1")
+end
+
+function create_model!(e_vcycle_input,kappa_input,gamma_input;kernel=(3,3))
+    input = 2
+    if e_vcycle_input == true
+        input = input+2
+    end
+    if kappa_input == true
+        input = input+1
+    end
+    if gamma_input == true
+        input = input+2
+    end
+    return SUnet(input,2;kernel=kernel)
 end
