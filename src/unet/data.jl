@@ -32,13 +32,12 @@ function generate_r_vcycle!(n, kappa, omega, gamma, x_true; v2_iter=10, level=3)
     return r_vcycle, e_true
 end
 
-function generate_random_data!(m, n, kappa, omega, gamma; v2_iter=10, level=3,
-                                                          e_vcycle_input=true, data_augmentetion=true,
+function generate_random_data!(m, n, kappa, omega, gamma; e_vcycle_input=true, v2_iter=10, level=3, data_augmentetion=false,
                                                           cifar_kappa=true, kappa_input=true, kappa_smooth=true)
     h = 1.0./n;
 
     dataset = Tuple[]
-    m = data_augmentetion == true ? Int(0.5*m) : m
+    m = data_augmentetion == true ? floor(Int64,0.75*m) : m
     for i = 1:m
 
         # Generate Model
@@ -60,33 +59,22 @@ function generate_random_data!(m, n, kappa, omega, gamma; v2_iter=10, level=3,
             input = r_vcycle_channels
         end
 
-        # Append Model
         input = kappa_input == true ? cat(input, reshape(kappa, n-1, n-1, 1, 1), dims=3) : input
-
         append!(dataset,[(input, e_true_channels)])
 
-        if data_augmentetion == true
-            (er2,e2) = dataset[rand(1:size(dataset,1))]
+        # Data Augmentetion
+        if data_augmentetion == true && mod(i,3) == 0
+            (input_2,e_2) = dataset[rand(1:size(dataset,1))]
+            r_index = e_vcycle_input == true ? 3 : 1
+            r_2 = input_2[:,:,r_index:r_index+1,:]
 
-            r2 = er2[:,:,end-1:end,:]
             scalar = abs(rand(Float64))
-            rt = scalar*r_vcycle_channels+(1-scalar)*r2
+            r_t = scalar*r_vcycle_channels+(1-scalar)*r_2
+            scale = (scalar*norm(r_vcycle_channels) + (1-scalar)*norm(r_2))/norm(r_t)
 
-            scale = (scalar*norm(r_vcycle_channels) + (1-scalar)*norm(r2))/norm(rt)
-            rt = rt * scale
-            et = (scalar*e_true_channels+(1-scalar)*e2)*scale
-
-            if e_vcycle_input == true
-                et_vcycle, et_vcycle_channels = generate_vcycle!(n, kappa, omega, gamma, rt[:,:,1,1] + im*rt[:,:,2,1])
-                input = cat(et_vcycle_channels, rt, dims=3)
-            else
-                input = rt
-            end
-            if kappa_input == true
-                kappa = cifar_model!(n;smooth=kappa_smooth)
-                input = cat(input, reshape(kappa, n-1, n-1, 1, 1), dims=3)
-            end
-            append!(dataset,[(input, et)])
+            input_t = (scalar*input+(1-scalar)*input_2)*scale
+            e_t = (scalar*e_true_channels+(1-scalar)*e_2)*scale
+            append!(dataset,[(input_t, e_t)])
         end
     end
     return dataset
