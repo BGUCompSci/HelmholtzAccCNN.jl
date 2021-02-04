@@ -17,6 +17,9 @@ block_laplacian_filter = block_filter!(3, laplacian_filter, 2)
 up = ConvTranspose(smooth_up_filter, [0.0], stride=2)
 down = Conv(smooth_down_filter, [0.0], stride=2)
 
+block_up = ConvTranspose(block_filter!(3, smooth_up_filter, 2), [0.0], stride=2)
+block_down = Conv(block_filter!(3, smooth_down_filter, 2), [0.0], stride=2)
+
 function laplacian_conv!(grid; h= 1)
     filter = (1.0 / (h^2)) * laplacian_filter
     conv = Conv(filter, [0.0], pad=(1,1))

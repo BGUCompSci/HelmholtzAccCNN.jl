@@ -6,8 +6,8 @@ function BatchNormWrap(out_ch)
 	  x->squeeze(x))|> cgpu
 end
 
-UNetConvBlock(in_chs, out_chs; kernel = (3, 3)) =
-    Chain(Conv(kernel, in_chs=>out_chs, pad=2;init=_random_normal),
+UNetConvBlock(in_chs, out_chs; kernel = (3, 3), pad=1) =
+    Chain(Conv(kernel, in_chs=>out_chs, pad=pad;init=_random_normal),
 	BatchNorm(out_chs),
 	x->elu.(x,0.2f0))|> cgpu
 
@@ -44,11 +44,11 @@ end
 
 @functor ResidualBlock
 
-function ResidualBlock(in_chs::Int, out_chs::Int; kernel = (3, 3))
-    layers = Chain(Conv(kernel, in_chs=>out_chs,pad = (1, 1);init=_random_normal),
+function ResidualBlock(in_chs::Int, out_chs::Int; kernel = (3, 3), pad =1)
+    layers = Chain(Conv(kernel, in_chs=>out_chs,pad = pad;init=_random_normal),
                 	BatchNorm(out_chs),
                 	x->elu.(x,0.2f0),
-                    Conv(kernel, out_chs=>out_chs,pad = (1, 1);init=_random_normal))|> cgpu
+                    Conv(kernel, out_chs=>out_chs,pad = 1;init=_random_normal))|> cgpu
     shortcut = Conv((1,1),in_chs=>out_chs)|> cgpu
     bn = BatchNorm(out_chs)|> cgpu
     ResidualBlock(layers, shortcut, bn)|> cgpu
@@ -99,6 +99,45 @@ function (u::SUnet)(x::AbstractArray)
     # 63 X 63 X 64 X 1 -> 63 X 63 X 2 X 1
     tanh.(u.up_blocks[end](up_x3))
 end
+
+# function SUnet(channels::Int = 2, labels::Int = channels; kernel = (3, 3))
+#   conv_down_blocks = Chain(ConvDown(16,16),
+# 		      ConvDown(32,32),
+# 		      ConvDown(64,64),
+# 		      ConvDown(128,128))|> cgpu
+#
+#   conv_blocks = Chain(UNetConvBlock(channels, 8; kernel = kernel),
+# 		 UNetConvBlock(8, 64; kernel = kernel),
+# 		 UNetConvBlock(64, 128; kernel = kernel),
+# 		 UNetConvBlock(128, 256; kernel = kernel),
+# 		 UNetConvBlock(256, 256; kernel = kernel))|> cgpu
+#
+#   up_blocks = Chain(UNetUpBlock(256, 128),
+# 		UNetUpBlock(256, 64),
+# 		Chain(x->elu.(x,0.2f0),
+# 		Conv((3, 3), pad=1,128=>labels;init=_random_normal)))|> cgpu
+#   SUnet(conv_down_blocks, conv_blocks, up_blocks)
+# end
+#
+# function (u::SUnet)(x::AbstractArray)
+#     # 63 X 63 X 4 X 1 -> 63 X 63 X 64 X 1
+#     op = u.conv_blocks[1:2](x)
+#     # 63 X 63 X 64 X 1 -> 31 X 31 X 128 X 1
+#     x1 = u.conv_blocks[3](u.conv_down_blocks[3](op))
+#     # 31 X 31 X 128 X 1 -> 15 X 15 X 256 X 1
+#     x2 = u.conv_blocks[4](u.conv_down_blocks[4](x1))
+#
+#     # 15 X 15 X 256 X 1 -> 15 X 15 X 256 X 1
+#     up_x2 = u.conv_blocks[5](x2)
+#     #up_x2 = u.conv_blocks[5](up_x2)
+#
+#     # 15 X 15 X 256 X 1 -> 31 X 31 X 256 X 1
+#     up_x1 = u.up_blocks[1](up_x2, x1)
+#     # 31 X 31 X 256 X 1 -> 63 X 63 X 128 X 1
+#     up_x3 = u.up_blocks[2](up_x1, op)
+#     # 63 X 63 X 128 X 1 -> 63 X 63 X 2 X 1
+#     tanh.(u.up_blocks[end](up_x3))
+# end
 
 function Base.show(io::IO, u::SUnet)
     println(io, "SUnet:")

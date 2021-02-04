@@ -1,6 +1,6 @@
 
 function _random_normal(shape...)
-  return Float32.(rand(Normal(0.f0,0.02f0),shape...))
+  return Float64.(rand(Normal(0.f0,0.02f0),shape...))
 end
 
 function extract_bboxes(mask)

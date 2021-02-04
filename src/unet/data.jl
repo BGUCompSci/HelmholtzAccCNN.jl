@@ -39,9 +39,16 @@ function generate_random_data!(m, n, kappa, omega, gamma; e_vcycle_input=true, v
     dataset = Tuple[]
     m = data_augmentetion == true ? floor(Int64,0.75*m) : m
     for i = 1:m
-
+        #n = mod(i,5) == 0 ? 128 : 64
+        f  = n==128 ? 10.0 : 5.0
+        kappa = ones(Float64,n-1,n-1)
+        omega = 2*pi*f;
+        gamma_val = 0.00001
+        gamma = gamma_val*2*pi * ones(ComplexF64,size(kappa));
+        pad_cells = [10;10]
+        gamma = absorbing_layer!(gamma, pad_cells, omega);
         # Generate Model
-        kappa = cifar_kappa == true ? cifar_model!(n;smooth=kappa_smooth) : kappa
+        kappa = (cifar_kappa == true) ? cifar_model!(n;smooth=kappa_smooth) : kappa
 
         # Generate Random Sample
         x_true = randn(ComplexF64,n-1,n-1, 1, 1)

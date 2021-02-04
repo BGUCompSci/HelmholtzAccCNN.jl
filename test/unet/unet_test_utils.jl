@@ -72,33 +72,40 @@ function unet_vs_vcycle!(model, n, kappa, omega, gamma, x_true, after_vcycle, e_
         return vec(e_vcycle)
     end
 
-    x = zeros(ComplexF64,n-1,n-1)
+    x_init = zeros(ComplexF64,n-1,n-1)
+    #x_init,flag,err,iter,resvec = KrylovMethods.fgmres(A, vec(r_vcycle), 2, tol=1e-30, maxIter=1,
+    #                                                M=M, x=vec(x_init), out=2, flexible=true)
+
     x1,flag1,err1,iter1,resvec1 = KrylovMethods.fgmres(A, vec(r_vcycle), restrt, tol=1e-30, maxIter=max_iter,
-                                                    M=M_Unet, x=vec(x), out=-1, flexible=true)
+                                                    M=M_Unet, x=vec(x_init), out=-1, flexible=true)
     @info "$(Dates.format(now(), "HH:MM:SS")) - Error with UNet: $(norm_diff!(reshape(x1,n-1,n-1),e_true[:,:,1,1]))"
 
-    x = zeros(ComplexF64,n-1,n-1)
+    x_init = zeros(ComplexF64,n-1,n-1)
     x2,flag2,err2,iter2,resvec2 = KrylovMethods.fgmres(A, vec(r_vcycle), restrt, tol=1e-30, maxIter=max_iter,
-                                                    M=M, x=vec(x), out=-1, flexible=true)
+                                                    M=M, x=vec(x_init), out=-1, flexible=true)
 
     @info "$(Dates.format(now(), "HH:MM:SS")) - Error without UNet: $(norm_diff!(reshape(x2,n-1,n-1),e_true[:,:,1,1]))"
 
     return resvec1, resvec2
 end
 
-function check_model!(test_name, n, kappa, omega, gamma, e_vcycle_input, kappa_input, gamma_input, kernel, m, restrt, max_iter; v2_iter=10, level=3, smooth=true)
-    model = create_model!(e_vcycle_input,kappa_input,gamma_input;kernel = kernel)
+function load_model!(test_name, e_vcycle_input, kappa_input, gamma_input;kernel = (3,3))
+    model = create_model!(e_vcycle_input, kappa_input, gamma_input; kernel = kernel)
 
     model = model|>cpu
     @load "$(test_name).bson" model
     @info "$(Dates.format(now(), "HH:MM:SS")) - Load Model"
     model = model|>cgpu
 
+    return model
+end
+
+function check_model!(test_name, model, n, f, kappa, omega, gamma, e_vcycle_input, cifar_kappa, kappa_input, gamma_input, kernel, m, restrt, max_iter; v2_iter=10, level=3, smooth=true)
     unet_results = zeros(m,2,restrt*max_iter)
     vcycle_results = zeros(m,2,restrt*max_iter)
     for i=1:m
         x_true = randn(ComplexF64,n-1,n-1, 1, 1)
-        kappa = cifar_model!(n;smooth=smooth)
+        kappa = cifar_kappa == true ? cifar_model!(n;smooth=smooth) : kappa
         resvec1, resvec2 = unet_vs_vcycle!(model, n, kappa, omega, gamma, x_true, true, e_vcycle_input, kappa_input, gamma_input, restrt, max_iter; v2_iter=v2_iter, level=level)
         unet_results[i,1,:] = resvec1
         vcycle_results[i,1,:] = resvec2
@@ -107,6 +114,6 @@ function check_model!(test_name, n, kappa, omega, gamma, e_vcycle_input, kappa_i
         vcycle_results[i,2,:] = resvec2
     end
 
-    unet_vs_vcycle_graph!("$(test_name) test_n=$(n) f=$(f)", mean(unet_results[:,1,:],dims=1)', mean(vcycle_results[:,1,:],dims=1)', true, e_vcycle_input)
-    unet_vs_vcycle_graph!("$(test_name) test_n=$(n) f=$(f)", mean(unet_results[:,2,:],dims=1)', mean(vcycle_results[:,2,:],dims=1)', false, e_vcycle_input)
+    unet_vs_vcycle_graph!("$(test_name) t_n=$(n) t_f=$(f) t_cifar=$("$(cifar_kappa)"[1])", mean(unet_results[:,1,:],dims=1)', mean(vcycle_results[:,1,:],dims=1)', true, e_vcycle_input)
+    unet_vs_vcycle_graph!("$(test_name) t_n=$(n) t_f=$(f) t_cifar=$("$(cifar_kappa)"[1])", mean(unet_results[:,2,:],dims=1)', mean(vcycle_results[:,2,:],dims=1)', false, e_vcycle_input)
 end

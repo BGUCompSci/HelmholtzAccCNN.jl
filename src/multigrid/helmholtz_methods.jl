@@ -38,7 +38,7 @@ function v_cycle_helmholtz!(n, h, x, b, kappa, omega, gamma; u = 1, v1_iter = 1,
     # Relax on Ax = b v1_iter times with initial guess x
     x = jacobi_helmholtz_method!(n, h, x, b, shifted_laplacian_matrix; max_iter=v1_iter, use_gmres_alpha=use_gmres_alpha)
 
-    if( n % 2 == 0 && n > 4 && (level == nothing || level > 0))
+    if( n % 2 == 0 && n > 4 && (level == nothing || level > 1))
 
         # Compute residual on fine grid
         x_matrix = reshape(x, n-1, n-1, 1, 1)
