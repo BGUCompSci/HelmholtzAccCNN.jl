@@ -1,6 +1,6 @@
 
 function _random_normal(shape...)
-  return Float64.(rand(Normal(0.f0,0.02f0),shape...))
+  return u_type.(rand(Normal(0.f0,0.02f0),shape...))|> gpu
 end
 
 function extract_bboxes(mask)
@@ -30,7 +30,7 @@ function extract_bboxes(masks::AbstractArray{T,4}) where T
   reduce(vcat, bs)
 end
 
-expand_dims(x,n::Int) = reshape(x,ones(Int64,n)...,size(x)...)
+expand_dims(x,n::Int) = reshape(x,ones(Int32,n)...,size(x)...)
 function squeeze(x)
     if size(x)[end] != 1
         return dropdims(x, dims = tuple(findall(size(x) .== 1)...))
@@ -47,20 +47,20 @@ function bce(ŷ, y; ϵ=gpu(fill(eps(first(ŷ)), size(ŷ)...)))
   l1 .- l2
 end
 
-function bce_loss(x, y)
-  op = clamp.(u(x), 0.001f0, 1.f0)
+function loss_bce(x, y)
+  op = clamp.(model(x), 0.001f0, 1.f0)
   mean(bce(op, y))
 end
 
 function complex_grid_to_channels!(grid, n)
-    grid_channels = zeros(n-1, n-1, 2, 1)
+    grid_channels = zeros(u_type, n-1, n-1, 2, 1)
     grid_channels[:, :, 1, :] = real(grid)
     grid_channels[:, :, 2, :] = imag(grid)
     return grid_channels
 end
 
 function complex_helmholtz_to_channels!(helmholtz_matrix, n)
-    helmholtz_channels = zeros(n-1, n-1, 2, 2)
+    helmholtz_channels = zeros(u_type, n-1, n-1, 2, 2)
     helmholtz_channels[:,:,1,1] = real(helmholtz_matrix)
     helmholtz_channels[:,:,2,1] = -imag(helmholtz_matrix)
     helmholtz_channels[:,:,1,2] = imag(helmholtz_matrix)
@@ -69,12 +69,13 @@ function complex_helmholtz_to_channels!(helmholtz_matrix, n)
 end
 
 function check_helmholtz_channels!(helmholtz_matrix, x, n)
-    helmholtz_channels = complex_helmholtz_to_channels!(helmholtz_matrix, n)
-    x_channels = complex_grid_to_channels!(x, n)
+    helmholtz_channels = complex_helmholtz_to_channels!(helmholtz_matrix, n)|> gpu
+    x_channels = complex_grid_to_channels!(x, n)|> gpu
 
-    original_result = helmholtz_chain!(x, helmholtz_matrix; h=h)
-    channels_result = helmholtz_chain_channels!(x_channels, helmholtz_channels; h=h)
+    original_result = helmholtz_chain!(x, helmholtz_matrix; h=h)|> gpu
+    channels_result = helmholtz_chain_channels!(x_channels, helmholtz_channels, n; h=h)
     channels_result = channels_result[:,:,1,:]+im*channels_result[:,:,2,:]
 
+    @info "$(Dates.format(now(), "HH:MM:SS")) - Check Helmholtz Channels $(norm(channels_result .- original_result)), $(original_result[1,1,1,1]), $(channels_result[1,1,1,1])"
     println(norm(channels_result - original_result))
 end

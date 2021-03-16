@@ -1,4 +1,3 @@
-# Multigrid Flux Filters
 
 smooth_up_filter = reshape((1/4) * [1 2 1;2 4.0 2;1 2 1],3,3,1,1)
 smooth_down_filter = reshape((1/16) * [1 2 1;2 4 2;1 2 1],3,3,1,1)

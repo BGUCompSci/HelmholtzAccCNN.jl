@@ -11,7 +11,7 @@ function Jacobi(func, n, x, b, matrix; max_iter=1, w=0.8, use_gmres_alpha=0)
 end
 
 function BlockFilter(filter_size, kernel, channels)
-    w = zeros(Float64, filter_size, filter_size, channels, channels)
+    w = zeros(r_type, filter_size, filter_size, channels, channels)
     for i in 1:channels
         w[:,:,i,i] = kernel
     end
@@ -72,8 +72,8 @@ function VcycleUnet()
     down_block_conv = Conv((5,5), 2=>2, stride=(2,2), pad = 1)|> cgpu # Conv(smooth_down_block_kernel, [0.0], stride=2) |> cgpu #
     down_conv = Conv((5,5),1=>1,stride=(2,2), pad = 1)|> cgpu # Conv(BlockFilter(3, smooth_down_kernel, 1), [0.0], stride=2) |> cgpu #
     i_conv = Conv((1,1),2=>2)|> cgpu
-    laplace_conv  = Conv(laplacian_block_kernel, [0.0], pad=(1,1))|> cgpu
-    helmholtz_conv(h, matrix, x) = ((1.0 / (h^2)) .* laplace_conv(x)) .- sum(i_conv(matrix) .* i_conv(x), dims=4)
+    laplace_conv  = Conv((3,3), 2=>2, pad=1)|> cgpu # Conv(laplacian_block_kernel, [0.0], pad=(1,1))
+    helmholtz_conv(h, matrix, x) = (1.0 / (h^2)) .* i_conv(laplace_conv(x)) - sum(i_conv(matrix) .* i_conv(x), dims=4) # ((1.0 / (h^2)) .*
     get_matrices = GetMatrices([0.5]|> cgpu)
     n = 64
     f = n == 64 ? 5.0 : 10.0
@@ -94,7 +94,7 @@ function (u::VcycleUnet)(x::AbstractArray)
     h_matrix, s_matrix = u.get_matrices(kappa, omega, gamma_r, gamma_i)
 
     # Relax on Ae = r v1_iter times with initial guess e
-    e = zeros(Float64, u.n-1, u.n-1, 2, 1)|> cgpu
+    e = zeros(r_type, u.n-1, u.n-1, 2, 1)|> cgpu
     e = u.jacobi(u.helmholtz_conv, u.n, e, r, s_matrix; max_iter=1)
     residual_fine = r - u.helmholtz_conv(h, h_matrix, e)
 
@@ -103,11 +103,11 @@ function (u::VcycleUnet)(x::AbstractArray)
     kappa_coarse_1 = u.down_conv(kappa)
     gamma_r_coarse_1 = u.down_conv(gamma_r)
     gamma_i_coarse_1 = u.down_conv(gamma_i)
-    n_coarse_1 = floor(Int64,u.n / 2)
+    n_coarse_1 = floor(Int32,u.n / 2)
     h_matrix_coarse_1, s_matrix_coarse_1 = u.get_matrices(kappa_coarse_1, omega, gamma_r_coarse_1, gamma_i_coarse_1)
 
     # Relax on Ae = r v1_iter times with initial guess e
-    e_coarse_1 = zeros(Float64, n_coarse_1-1, n_coarse_1-1, 2, 1)|> cgpu
+    e_coarse_1 = zeros(r_type, n_coarse_1-1, n_coarse_1-1, 2, 1)|> cgpu
     e_coarse_1 = u.jacobi(u.helmholtz_conv, n_coarse_1, e_coarse_1, r_coarse_1, s_matrix_coarse_1; max_iter=1)
     residual_coarse_1 = r_coarse_1 - u.helmholtz_conv(2.0*h, h_matrix_coarse_1, e_coarse_1)
 
@@ -116,11 +116,11 @@ function (u::VcycleUnet)(x::AbstractArray)
     kappa_coarse = u.down_conv(kappa_coarse_1)
     gamma_r_coarse = u.down_conv(gamma_r_coarse_1)
     gamma_i_coarse = u.down_conv(gamma_i_coarse_1)
-    n_coarse = floor(Int64,n_coarse_1 / 2)
+    n_coarse = floor(Int32,n_coarse_1 / 2)
     h_matrix_coarse, s_matrix_coarse = u.get_matrices(kappa_coarse, omega, gamma_r_coarse, gamma_i_coarse)
 
     # Solve Coarser
-    e_coarse = zeros(Float64, n_coarse-1, n_coarse-1, 2, 1)|> cgpu
+    e_coarse = zeros(r_type, n_coarse-1, n_coarse-1, 2, 1)|> cgpu
     e_coarse = u.jacobi(u.helmholtz_conv, n_coarse, e_coarse, r_coarse, s_matrix_coarse; max_iter=3)
 
     # Correct

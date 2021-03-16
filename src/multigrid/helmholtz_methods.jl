@@ -51,7 +51,7 @@ function v_cycle_helmholtz!(n, h, x, b, kappa, omega, gamma; u = 1, v1_iter = 1,
 
         # Recursive operation of the method on the coarse grid
         n_coarse = size(residual_coarse,1)+1
-        x_coarse = zeros(ComplexF64,n_coarse-1, n_coarse-1)
+        x_coarse = zeros(c_type,n_coarse-1, n_coarse-1)
 
         for i = 1:u
             x_coarse, helmholtz_matrix_coarse = v_cycle_helmholtz!(n_coarse, h*2, x_coarse, residual_coarse, kappa_coarse, omega, gamma_coarse; use_gmres_alpha = use_gmres_alpha,
@@ -72,7 +72,7 @@ function v_cycle_helmholtz!(n, h, x, b, kappa, omega, gamma; u = 1, v1_iter = 1,
         # Coarsest grid
         A_Coarsest(v) = vec(helmholtz_chain!(reshape(v, n-1, n-1, 1, 1), shifted_laplacian_matrix; h=h))
         M_Coarsest(v) = M_Jacobi(n, h, x, shifted_laplacian_matrix, 1, v; use_gmres_alpha=use_gmres_alpha)
-        x,flag,err,iter,resvec = KrylovMethods.fgmres(A_Coarsest, vec(b), v2_iter, tol=1e-15, maxIter=3,
+        x,flag,err,iter,resvec = KrylovMethods.fgmres(A_Coarsest, vec(b), v2_iter, tol=1e-15, maxIter=1,
                                                     M=M_Coarsest, x=vec(x), out=-1, flexible=true)
         x = reshape(x, n-1, n-1)
     end
