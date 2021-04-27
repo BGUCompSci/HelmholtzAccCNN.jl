@@ -11,7 +11,7 @@ using Dates
 using Random
 using BSON: @load
 pyplot()
-
+cgpu = cpu
 r_type = Float64
 c_type = ComplexF64
 u_type = Float16
@@ -44,7 +44,29 @@ gamma = absorbing_layer!(gamma, pad_cells, omega);
 # V cycle
 
 x = randn(c_type,n-1,n-1,1,1)
-heatmap(real(x[:,:,1,1]), color=:grays)
+xh = x .* h^2
+
 _, helmholtz_matrix = get_helmholtz_matrices!(kappa, omega, gamma; alpha=0.5)
-b = (h^2) .* helmholtz_chain!(x, helmholtz_matrix; h=h)
+
+b = helmholtz_chain!(x, helmholtz_matrix; h=h)
+bh = helmholtz_chain!(xh, helmholtz_matrix; h=h)
+bh2 = b .* h^2
+
+heatmap(real(x[:,:,1,1]), color=:grays)
+heatmap(real(xh[:,:,1,1]), color=:grays)
+
 heatmap(real(b[:,:,1,1]), color=:grays)
+heatmap(real(bh[:,:,1,1]), color=:grays)
+heatmap(real(bh2[:,:,1,1]), color=:grays)
+
+x_vc = fgmres_v_cycle_helmholtz!(n, h, b, kappa, omega, gamma; restrt=30, maxIter=10)
+println("$(norm(x-x_vc)/norm(x))")
+println("$(norm(xh - x_vc .* h^2) / norm(xh))")
+xh_vc = fgmres_v_cycle_helmholtz!(n, h, bh, kappa, omega, gamma; restrt=30, maxIter=10)
+println("$(norm(xh-xh_vc)/norm(xh))")
+println("$(norm(x - xh_vc ./ h^2) / norm(x))")
+println("$(norm(x .* h^2 - xh_vc) / norm(xh_vc))")
+
+
+heatmap(real(x[:,:,1,1]), color=:grays)
+heatmap(real((xh_vc ./ h^2)[:,:,1,1]), color=:grays)

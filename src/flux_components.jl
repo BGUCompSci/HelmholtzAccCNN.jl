@@ -19,6 +19,8 @@ down = Conv(smooth_down_filter, [0.0], stride=2)
 block_up = ConvTranspose(block_filter!(3, smooth_up_filter, 2), [0.0], stride=2)
 block_down = Conv(block_filter!(3, smooth_down_filter, 2), [0.0], stride=2)
 
+i_conv = Conv(block_filter!(1, reshape([1.0],1,1,1,1), 2),[0.0])|> cgpu
+
 function laplacian_conv!(grid; h= 1)
     filter = (1.0 / (h^2)) * laplacian_filter
     conv = Conv(filter, [0.0], pad=(1,1))
@@ -34,7 +36,6 @@ end
 
 function helmholtz_chain_channels!(grid, matrix, n; h = 1)
     filter = (1.0 / (h^2)) * block_laplacian_filter
-    conv = Conv(filter, [0.0], pad=(1,1))
-    chain = Chain(x -> conv(x) .- reshape(sum(matrix .* x, dims=3), n-1, n-1, 2, 1))
-    return chain(grid)
+    conv = Conv(u_type.(filter), [u_type(0.0)], pad=(1,1))|> cgpu
+    return conv(grid) .- sum(matrix .* grid, dims=4)
 end

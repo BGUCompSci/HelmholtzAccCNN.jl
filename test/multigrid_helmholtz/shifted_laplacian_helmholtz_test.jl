@@ -27,7 +27,7 @@ omega = 2*pi*f;
 # Gamma
 
 gamma_val = 0.00001
-gamma = gamma_val*2*pi * ones(ComplexF64,size(kappa));
+gamma = gamma_val*2*pi * ones(Float64,size(kappa));
 pad_cells = [20;20]
 gamma = absorbing_layer!(gamma, pad_cells, omega);
 

@@ -118,3 +118,21 @@ function absorbing_layer!(gamma::Array,pad,ABLamp;NeumannAtFirstDim=false)
 
     return gamma
 end
+
+function fgmres_v_cycle_helmholtz!(n, h, b, kappa, omega, gamma; restrt=30, maxIter=10)
+    shifted_laplacian_matrix, helmholtz_matrix = get_helmholtz_matrices!(kappa, omega, gamma; alpha=0.5)
+    A(v) = vec(helmholtz_chain!(reshape(v, n-1, n-1, 1, 1), helmholtz_matrix; h=h))
+    function M(v)
+        v = reshape(v, n-1, n-1)
+        x = zeros(ComplexF64,n-1,n-1)
+        x, = v_cycle_helmholtz!(n, h, x, v, kappa, omega, gamma; u=1,
+                    v1_iter = 1, v2_iter = 20, alpha=0.5, log = 0, level = 3)
+        return vec(x)
+    end
+    x = zeros(ComplexF64,n-1,n-1)
+    x,flag,err,iter,resvec = KrylovMethods.fgmres(A, vec(b), restrt, tol=1e-30, maxIter=maxIter,
+                                                    M=M, x=vec(x), out=-1, flexible=true)
+
+    @info "$(Dates.format(now(), "HH:MM:SS")) - fgmres_v_cycle_helmholtz : $(resvec[end])"
+    return reshape(x, n-1, n-1)
+end
