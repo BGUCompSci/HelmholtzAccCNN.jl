@@ -128,15 +128,15 @@ function full_solution_loss1!(model, input, output, n, f)
     e3 = e1 + e2
 
     e4 = jacobi_channels!(n, e3, r ./ (h^2), h_matrix)
-    ae4 = (h^2) .* helmholtz_chain_channels!(e4, h_matrix, n; h=h)|> cgpu
-    r2 = r - ae4
+    # ae4 = (h^2) .* helmholtz_chain_channels!(e4, h_matrix, n; h=h)|> cgpu
+    # r2 = r - ae4
 
-    e5 = model(cat(r2,kappa,gamma,dims=3)|> cgpu)
-    e6 = e4 + e5
+    # e5 = model(cat(r2,kappa,gamma,dims=3)|> cgpu)
+    # e6 = e4 + e5
 
-    e7 = jacobi_channels!(n, e6, r ./ (h^2), h_matrix)
+    # e7 = jacobi_channels!(n, e6, r ./ (h^2), h_matrix)
 
-    return norm_diff!(e0, e|> cgpu) + norm_diff!(e3, e|> cgpu) + norm_diff!(e6, e|> cgpu) + norm_diff!(e7, e|> cgpu)
+    return norm_diff!(e0, e|> cgpu) + norm_diff!(e3, e|> cgpu) + norm_diff!(e4, e|> cgpu)
     #return norm_diff!(e0, e|> cgpu) + norm_diff!(e1, e|> cgpu) + norm_diff!(e3, e|> cgpu) + norm_diff!(e4, e|> cgpu) + norm_diff!(e6, e|> cgpu) + norm_diff!(e7, e|> cgpu)
 end
 
@@ -161,13 +161,13 @@ function full_solution_loss_details1!(model, input, output, n, f)
     e3 = e1 + e2
 
     e4 = jacobi_channels!(n, e3, r ./ (h^2), h_matrix)
-    ae4 = (h^2) .* helmholtz_chain_channels!(e4, h_matrix, n; h=h)|> cgpu
-    r2 = r - ae4
+    # ae4 = (h^2) .* helmholtz_chain_channels!(e4, h_matrix, n; h=h)|> cgpu
+    # r2 = r - ae4
 
-    e5 = model(cat(r2,kappa,gamma,dims=3)|> cgpu)
-    e6 = e4 + e5
+    # e5 = model(cat(r2,kappa,gamma,dims=3)|> cgpu)
+    # e6 = e4 + e5
 
-    e7 = jacobi_channels!(n, e6, r ./ (h^2), h_matrix)
+    # e7 = jacobi_channels!(n, e6, r ./ (h^2), h_matrix)
 
     # if norm(r) > 70 && norm(r) < 70.005 # mod(print_index,1000) == 0
     #     @info "e $(norm(e)) r $(norm(r)) e0 $(norm(e0)) e1 $(norm(e1)) ae1 $(norm(ae1)) r1 $(norm(r1)) e2 $(norm(e2)) e3 $(norm(e3)) e4 $(norm(e4)) ae4 $(norm(ae4)) r2 $(norm(r2)) e5 $(norm(e5)) e6 $(norm(e6)) e7 $(norm(e7))"
@@ -175,14 +175,15 @@ function full_solution_loss_details1!(model, input, output, n, f)
     #
     # end
     # print_index = print_index+1
-    return [norm_diff!(e0, e|> cgpu) + norm_diff!(e3, e|> cgpu) + norm_diff!(e6, e|> cgpu) + norm_diff!(e7, e|> cgpu),
-            norm_diff!(e0, e|> cgpu), norm_diff!(e1, e|> cgpu), norm_diff!(e3, e|> cgpu), norm_diff!(e4, e|> cgpu), norm_diff!(e6, e|> cgpu), norm_diff!(e7, e|> cgpu)] #  + norm_diff!(e4, e|> cgpu) + norm_diff!(e6, e|> cgpu) + norm_diff!(e7, e|> cgpu)
+    return [norm_diff!(e0, e|> cgpu) + norm_diff!(e3, e|> cgpu) + norm_diff!(e4, e|> cgpu),
+            norm_diff!(e0, e|> cgpu), norm_diff!(e3, e|> cgpu), norm_diff!(e4, e|> cgpu)] #  + norm_diff!(e4, e|> cgpu) + norm_diff!(e6, e|> cgpu) + norm_diff!(e7, e|> cgpu)
 end
 
 function train_residual_unet!(test_name, n, f, kappa, omega, gamma,
                             train_size, test_size, batch_size, iterations, init_lr;
                             e_vcycle_input=true, v2_iter=10, level=3, data_augmentetion=true, kappa_type=1, threshold=50,
-                            kappa_input=true, kappa_smooth=false, gamma_input=false, kernel=(3,3), smaller_lr=10, axb=false, norm_input=false, model_type=SUnet, data_path="", full_loss=false, error_details=false, gmres_restrt=1)
+                            kappa_input=true, kappa_smooth=false, k_kernel=3, gamma_input=false, kernel=(3,3), smaller_lr=10, axb=false, norm_input=false,
+                            model_type=SUnet, k_type=NaN, k_chs=-1, indexes=3, data_path="", full_loss=false, error_details=false, gmres_restrt=1, σ=elu)
 
     @info "$(Dates.format(now(), "HH:MM:SS")) - Start Train $(test_name)"
 
@@ -199,30 +200,31 @@ function train_residual_unet!(test_name, n, f, kappa, omega, gamma,
     else
         train_set = generate_random_data!(train_size, n, kappa, omega, gamma;
                                                 e_vcycle_input=e_vcycle_input, v2_iter=v2_iter, level=level, data_augmentetion =data_augmentetion,
-                                                kappa_type=kappa_type, threshold=threshold, kappa_input=kappa_input, kappa_smooth=kappa_smooth, axb=axb, norm_input=norm_input, gmres_restrt=gmres_restrt)
+                                                kappa_type=kappa_type, threshold=threshold, kappa_input=kappa_input, kappa_smooth=kappa_smooth, k_kernel=k_kernel, axb=axb, norm_input=norm_input, gmres_restrt=gmres_restrt)
         test_set = generate_random_data!(test_size, n, kappa, omega, gamma;
                                                 e_vcycle_input=e_vcycle_input, v2_iter=v2_iter, level=level,
-                                                kappa_type=kappa_type, threshold=threshold, kappa_input=kappa_input, kappa_smooth=kappa_smooth, axb=axb, norm_input=norm_input, gmres_restrt=gmres_restrt)
+                                                kappa_type=kappa_type, threshold=threshold, kappa_input=kappa_input, kappa_smooth=kappa_smooth, k_kernel=k_kernel, axb=axb, norm_input=norm_input, gmres_restrt=gmres_restrt)
     end
     @info "$(Dates.format(now(), "HH:MM:SS")) - Generated Data"
 
-    model = create_model!(e_vcycle_input, kappa_input, gamma_input; kernel=kernel, type=model_type)|>cgpu
+    model = create_model!(e_vcycle_input, kappa_input, gamma_input; kernel=kernel, type=model_type, k_type=k_type, k_chs=k_chs, indexes=indexes, σ=σ)|>cgpu
 
-    batchs = floor(Int64,train_size / (batch_size*10))
+    batchs = floor(Int64,train_size / batch_size) # (batch_size*10))
     test_loss = zeros(iterations)
     train_loss = zeros(iterations)
     CSV.write("$(test_name) loss.csv", DataFrame(Train=[], Test=[]), delim = ';')
-    errors_count = 3
+    errors_count = 4
     if errors_count > 1 && full_loss == true
         # CSV.write("$(test_name) loss.csv", DataFrame(Train=[],Train_U1=[],Train_J1=[],Train_U2=[],Train_J2=[],Train_U3=[],Train_J3=[],Test=[]), delim = ';') # ,Test_U1=[],Test_J1=[],Test_U2=[],Test_J2=[])
-        CSV.write("$(test_name) loss.csv", DataFrame(Train=[],Train_E=[],Train_R=[],Test=[],Test_E=[],Test_R=[]), delim = ';') # ,Test_U1=[],Test_J1=[],Test_U2=[],Test_J2=[])
+        # CSV.write("$(test_name) loss.csv", DataFrame(Train=[],Train_E=[],Train_R=[],Test=[],Test_E=[],Test_R=[]), delim = ';') # ,Test_U1=[],Test_J1=[],Test_U2=[],Test_J2=[])
+        CSV.write("$(test_name) loss.csv", DataFrame(Train=[],Train_U1=[],Train_U2=[],Train_J2=[],Test=[]), delim = ';')
 
     end
 
     loss!(x, y) = error_loss!(model, x, y)
-    full_loss!(x, y) = full_solution_loss!(model, x, y, n, f)
+    full_loss!(x, y) = full_solution_loss1!(model, x, y, n, f)
     loss!(tuple) = loss!(tuple[1], tuple[2])
-    full_loss_details!(tuple) = full_solution_loss_details!(model, tuple[1], tuple[2], n, f)
+    full_loss_details!(tuple) = full_solution_loss_details1!(model, tuple[1], tuple[2], n, f)
 
     # Start model training
     append_gamma!(tuple) = append_input!(tuple,gamma)
@@ -232,8 +234,9 @@ function train_residual_unet!(test_name, n, f, kappa, omega, gamma,
         if mod(iteration,smaller_lr) == 0
             lr = lr / 10
             opt = ADAM(lr)
-            batch_size = min(batch_size * 2,train_size)
-            batchs = floor(Int64,train_size / min((batch_size*10),train_size))
+            batch_size = min(batch_size * 2,512)
+            batchs = floor(Int64,train_size / min((batch_size),train_size)) #*10
+            smaller_lr = ceil(Int64,smaller_lr / 2)
             @info "$(Dates.format(now(), "HH:MM:SS")) - Update Learning Rate $(lr) Batch Size $(batch_size)"
         end
         idxs = randperm(train_size)
@@ -255,8 +258,10 @@ function train_residual_unet!(test_name, n, f, kappa, omega, gamma,
             train_res = batch_loss!(train_set, full_loss_details!;errors_count=errors_count,gamma_input=gamma_input,append_gamma=append_gamma!)
             test_loss[iteration] = test_res[1]
             train_loss[iteration] = train_res[1]
+            CSV.write("$(test_name) loss.csv", DataFrame(Train=[train_res[1]],Train_U1=[train_res[2]],Train_U2=[train_res[3]],Train_J2=[train_res[4]],Test=[test_res[1]]), delim = ';', append=true)
+
             # CSV.write("$(test_name) loss.csv", DataFrame(Train=[train_res[1]],Train_U1=[train_res[2]],Train_J1=[train_res[3]],Train_U2=[train_res[4]],Train_J2=[train_res[5]],Train_U3=[train_res[6]],Train_J3=[train_res[7]],Test=[test_res[1]]), delim = ';', append=true)
-            CSV.write("$(test_name) loss.csv", DataFrame(Train=[train_res[1]],Train_E=[train_res[2]],Train_R=[train_res[3]],Test=[test_res[1]],Test_E=[test_res[2]],Test_R=[test_res[3]]), delim = ';', append=true)
+            #CSV.write("$(test_name) loss.csv", DataFrame(Train=[train_res[1]],Train_E=[train_res[2]],Train_R=[train_res[3]],Test=[test_res[1]],Test_E=[test_res[2]],Test_R=[test_res[3]]), delim = ';', append=true)
 
         else
             test_loss[iteration] = batch_loss!(test_set, loss!;gamma_input=gamma_input,append_gamma=append_gamma!)[1]

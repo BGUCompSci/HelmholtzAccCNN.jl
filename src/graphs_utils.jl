@@ -12,7 +12,7 @@ function unet_vs_vcycle_csv_to_graph!(title, path)
     unet_vs_vcycle_graph!("$(title) preconditioner test", df.VU, df.U, df.VV, df.V, df.JU)
 end
 
-unet_vs_vcycle_csv_to_graph!("08_12_37 50 2","graphs/08_12_37 DNUnet j=f axb=f g=-1 norm=f to 1 t=Float32 k=3 50 g=t e=f da=f k=2 n=128 f=10_0 m=25000 bs=5 opt=ADAM lr=0_0005 each=50 i=150 t_n=128 t_axb=t t_norm=f t_j=f preconditioner test.csv")
+unet_vs_vcycle_csv_to_graph!("20_12_55 SDNUnet1 256 0","graphs/csv/20_12_55 SDNUnet1 d=f axb=f g=-1 norm=f to 1 t=Float32 k=3 50 g=t e=f da=f k=0 n=256 f=20_0 m=25000 bs=5 opt=ADAM lr=0_0001 each=50 i=60 t_n=256 t_axb=f t_norm=f t_j=t preconditioner test.csv")
 
 function loss_csv_to_graph!(title, path)
     df = CSV.read(path)

@@ -18,24 +18,27 @@ end
 
 stl10_train = load_stl10()
 
-function generate_kappa!(n; type=0, smooth=false, threshold=50)
-    if type == 0 # Const Model
+function generate_kappa!(n; type=0, smooth=false, threshold=50, kernel=3)
+    if type == 0 # Uniform Model
         return ones(r_type, n-1, n-1)
     else
-        if type == 1 # CIFAR10 Model
-            index = rand(1:size(cifar_train,4))
-            sample = Gray.(colorview(RGB, cifar_train[:,:,1,index],cifar_train[:,:,2,index],cifar_train[:,:,3,index]))
-        else # STL10 Model
+        if type == 2 # STL10 Model
             index = rand(1:size(stl10_train,4))
             sample = Gray.(colorview(RGB, stl10_train[:,:,1,index] / 255,stl10_train[:,:,2,index] / 255,stl10_train[:,:,3,index] / 255))
+        else # CIFAR10 Model
+            index = 7706 # Const Model - 4
+            if type == 1
+                index = rand(1:size(cifar_train,4))
+            end
+            sample = Gray.(colorview(RGB, cifar_train[:,:,1,index],cifar_train[:,:,2,index],cifar_train[:,:,3,index]))
         end
 
         # Resize
         sample = imresize(sample, (n-1,n-1))
 
         # Smooth
-        if n < 70 && smooth == true
-            sample = imfilter(sample, Kernel.gaussian(1))
+        if smooth == true
+            sample = imfilter(sample, Kernel.gaussian(kernel))
         end
 
         # Sample ∈ [random threshold, 1]
