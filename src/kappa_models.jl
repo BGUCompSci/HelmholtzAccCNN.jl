@@ -43,7 +43,7 @@ function generate_kappa!(n; type=0, smooth=false, threshold=50, kernel=3)
 
         # Sample ∈ [random threshold, 1]
         sample = Float64.(sample)
-        threshold = 0.01 * rand(threshold:90)
+        threshold = 0.01 * threshold #  rand(threshold:90)
         sample_normal = threshold .+ (((1.0 - threshold) .* sample) ./ maximum(sample))
 
     	return sample_normal

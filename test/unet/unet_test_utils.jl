@@ -1,22 +1,18 @@
-function unet_vs_vcycle_title!(after_vcycle,e_vcycle_input)
-    if after_vcycle == true
-        if e_vcycle_input == true
-            return "M=Vcycle(r,Unet(Vcycle(r,0),r)) vs M=Vcycle(r,Vcycle(r,0))"
-        else
-            return "M=Vcycle(r,Unet(r)) vs M=Vcycle(r,Vcycle(r,0))"
-        end
-    else
-        if e_vcycle_input == true
-            return "M=Unet(Vcycle(r,0),r) vs M=Vcycle(r,0)"
-        else
-            return "M=Unet(r) vs M=Vcycle(r,0)"
+function convergence_factor!(vector)
+    val0 = vector[1]
+    index = length(vector)
+    for i=2:length(vector)
+        if vector[i] < (val0 ./ (10^6))
+            index = i
+            break
         end
     end
-end
-
-function convergence_factor!(vector)
-    length = argmin(vector)[1]
-    return round(((vector[length] / vector[1])^(1.0 / length)), digits=3)
+    # length = argmin(vector)[1]
+    if index > 200
+        return round(((vector[index] / vector[index-30])^(1.0 / 30)), digits=3), index
+    else
+        return round(((vector[index] / vector[1])^(1.0 / index)), digits=3), index
+    end
 end
 
 function unet_vs_vcycle_graph!(title, vc_unet_res, unet_res, vc_vc_res, vc_res, j_unet_res; after_vcycle=false, e_vcycle_input=false)
@@ -55,52 +51,369 @@ function unet_vs_vcycle_graph!(title, vc_unet_res, unet_res, vc_vc_res, vc_res, 
     @info "$(Dates.format(now(), "HH:MM:SS")) - Convergence Factors : $(factor_text)"
 end
 
-function unet_outof_gmres_graph!(title, vu_res, v_res, vv_res, vuv_res, vuj_res; after_vcycle=false, e_vcycle_input=false)
-    iterations = length(v_res)
-    iter = range(1, length=iterations)
-
-    factor = convergence_factor!(v_res)
-    factor_text = "v=$(factor)"
-    p = plot(iter,v_res,label="V $(factor)")
-
-    factor = convergence_factor!(vu_res)
-    factor_text = "$(factor_text) vu=$(factor)"
-    plot!(iter,vu_res,label="VU $(factor)")
-
-    factor = convergence_factor!(vuv_res)
-    factor_text = "$(factor_text) vuv=$(factor)"
-    plot!(iter,vuv_res,label="VUV $(factor)")
-
-    factor = convergence_factor!(vuj_res)
-    factor_text = "$(factor_text) vuj=$(factor)"
-    plot!(iter,vuj_res,label="VUJ $(factor)")
-
-    factor = convergence_factor!(vv_res)
-    factor_text = "$(factor_text) vv=$(factor)"
-    plot!(iter,vv_res,label="VV $(factor)")
-
-    yaxis!(L"\Vert b - Hx \Vert_2", :log10)
-    xlabel!("Iterations")
-
-    savefig("test/unet/results/$(title) $(factor_text)")
-    @info "$(Dates.format(now(), "HH:MM:SS")) - Convergence Factors : $(factor_text)"
-end
-
 function loss!(x, y)
     return norm(x .- y) / norm(y)
 end
 
-function unet_vs_vcycle!(model, n, kappa, omega, gamma, x_true, after_vcycle, e_vcycle_input, kappa_input, gamma_input, restrt, max_iter, relax_jacobi; v2_iter=10, level=3, axb=false, norm_input=false, log_error=true, test_name="", before_jacobi=false, unet_in_vcycle=false)
+function load_model!(test_name, e_vcycle_input, kappa_input, gamma_input;kernel=(3,3), model_type=SUnet, k_type=NaN, resnet_type=SResidualBlock, k_chs=-1, indexes=3, σ=elu, arch=0)
+    model = create_model!(e_vcycle_input, kappa_input, gamma_input; kernel=kernel, type=model_type, k_type=k_type, resnet_type=resnet_type, k_chs=k_chs, indexes=indexes, σ=σ, arch=arch)
+    model = model|>cpu
+    @load "$(test_name).bson" model
+    @info "$(Dates.format(now(), "HH:MM:SS")) - Load Model"
+    model = model|>cgpu
+
+    return model
+end
+
+function model_tuning!(model, test_name, kappa, omega, gamma, n, f, m, bs, iter, lr, threshold, axb, jac, k_kernel, restrt; residual_loss=false)
+    name = "$(test_name) $(n) $(m) $(bs) $(iter) $(k_kernel) $("$(axb)"[1]) $("$(jac)"[1]) $(restrt) r=$("$(residual_loss)"[1])"
+    model, train_loss, test_loss = train_residual_unet!(model, name, n, f, kappa, omega, gamma,
+                                                        m, 10, bs, iter, lr;
+                                                        e_vcycle_input=false, v2_iter=10, level=3, data_augmentetion=false,
+                                                        kappa_type=4, threshold=threshold, kappa_input=true, kappa_smooth=true, k_kernel=k_kernel,
+                                                        gamma_input=true, kernel=3, smaller_lr=24, axb=axb, jac=jac, norm_input=norm_input, model_type=model_type, k_type=k_type, k_chs=k_chs, indexes=indexes,
+                                                        data_path="", full_loss=false, residual_loss=residual_loss, gmres_restrt=restrt,σ=σ)
+    return model, name
+end
+
+function check_model!(test_name, model, n, f, kappa, omega, gamma, e_vcycle_input, kappa_type, kappa_input, gamma_input, kernel, m, restrt, max_iter; v2_iter=10, level=3, smooth=false, k_kernel=3, threshold=50, axb=false, norm_input=false, before_jacobi=false, log_error=false, unet_in_vcycle=false, indexes=3, arch=1) # arch - Standart (0) SplitUNet (1) FeaturesUNet (2)
+    unet_results = zeros(m,3,restrt*max_iter+1)
+    vcycle_results = zeros(m,2,restrt*max_iter+1)
+
+    # Log options
+    # CSV.write("$(test_name) t_n=$(n) t_axb=$("$(axb)"[1]) t_norm=$("$(norm_input)"[1]) unet error.csv",
+    #                      DataFrame(Title=[],EA=[],RA=[]), delim = ';')
+    # CSV.write("$(test_name) t_n=$(n) t_axb=$("$(axb)"[1]) t_norm=$("$(norm_input)"[1]) vcycle error.csv",
+    #                      DataFrame(Title=[],EA=[],RA=[]), delim = ';')
+    # CSV.write("$(test_name) t_n=$(n) t_axb=$("$(axb)"[1]) t_norm=$("$(norm_input)"[1]) unet error.csv",
+    #                     DataFrame(Title=[],EB=[],RB=[],EA=[],RA=[]), delim = ';')
+    # CSV.write("$(test_name) t_n=$(n) t_axb=$("$(axb)"[1]) t_norm=$("$(norm_input)"[1]) vcycle error.csv",
+    #                     DataFrame(Title=[],E=[],R=[]), delim = ';')
+    # CSV.write("training set.csv", DataFrame(RR=[], RI=[], KAPPA=[], ER=[], EI=[]), delim = ';',append=true)
+
+    for i=1:m
+        x_true = randn(c_type,n-1,n-1, blocks, 1)
+        kappa = generate_kappa!(n; type=kappa_type, smooth=smooth, threshold=threshold, kernel=k_kernel)
+        # heatmap(kappa, color=:blues)
+        # savefig("kappa $(kappa_type) $(threshold) $(k_kernel) $(i)")
+        # CSV.write("kappa $(kappa_type) $(threshold) $(k_kernel) $(i).csv", DataFrame(K=vec(kappa)), delim = ';')
+        kappa_features = NaN
+        if arch != 0
+            kappa_input = reshape(kappa, n-1, n-1, 1, 1)
+            if indexes != 3
+                kappa_input = cat(kappa_input, reshape(gamma, n-1, n-1, 1, 1), dims=3)
+            end
+            kappa_features = model.kappa_subnet(u_type.(kappa_input)|>cgpu)|>cpu
+            @info "$(Dates.format(now(), "HH:MM:SS")) - after kappa features $(size(kappa_features))"
+        end
+        resvec1, resvec2 = unet_vs_vcycle!(model, n, kappa, kappa_features, omega, gamma, x_true, true, e_vcycle_input, kappa_input, gamma_input, restrt, max_iter, false; v2_iter=v2_iter, level=level, axb=axb, norm_input=norm_input, log_error=log_error, test_name=test_name, before_jacobi=before_jacobi, unet_in_vcycle=unet_in_vcycle, arch=arch)
+        unet_results[i,1,:] = resvec1
+        vcycle_results[i,1,:] = resvec2
+        resvec1, resvec2 = unet_vs_vcycle!(model, n, kappa, kappa_features, omega, gamma, x_true, false, e_vcycle_input, kappa_input, gamma_input, restrt, max_iter, false; v2_iter=v2_iter, level=level, axb=axb, norm_input=norm_input, log_error=log_error, test_name=test_name, before_jacobi=before_jacobi, unet_in_vcycle=unet_in_vcycle, arch=arch)
+        unet_results[i,2,:] = resvec1
+        vcycle_results[i,2,:] = resvec2
+        resvec1, resvec2 = unet_vs_vcycle!(model, n, kappa, kappa_features, omega, gamma, x_true, false, e_vcycle_input, kappa_input, gamma_input, restrt, max_iter, true; v2_iter=v2_iter, level=level, axb=axb, norm_input=norm_input, log_error=log_error, test_name=test_name, before_jacobi=before_jacobi, unet_in_vcycle=unet_in_vcycle, arch=arch)
+        unet_results[i,3,:] = resvec1
+    end
+    unet_vs_vcycle_graph!("$(test_name) t_n=$(n) t_axb=$("$(axb)"[1]) t_norm=$("$(norm_input)"[1])",
+                    mean(unet_results[:,1,:],dims=1)', mean(unet_results[:,2,:],dims=1)', mean(vcycle_results[:,1,:],dims=1)', mean(vcycle_results[:,2,:],dims=1)', mean(unet_results[:,3,:],dims=1)')
+
+    CSV.write("test/unet/results/$(test_name) t_n=$(n) t_axb=$("$(axb)"[1]) t_norm=$("$(norm_input)"[1]) preconditioner test.csv",
+                                                        DataFrame(VU=vec(mean(unet_results[:,1,:],dims=1)'),
+                                                                U=vec(mean(unet_results[:,2,:],dims=1)'),
+                                                                VV=vec(mean(vcycle_results[:,1,:],dims=1)'),
+                                                                V=vec(mean(vcycle_results[:,2,:],dims=1)'),
+                                                                JU=vec(mean(unet_results[:,3,:],dims=1)')), delim = ';')
+end
+
+function unet_vs_vcycle!(model, n, kappa, kappa_features, omega, gamma, x_true, after_vcycle, e_vcycle_input, kappa_input, gamma_input, restrt, max_iter, relax_jacobi; v2_iter=10, level=3, axb=false, norm_input=false, log_error=true, test_name="", before_jacobi=false, unet_in_vcycle=false, arch=1)
+
+    shifted_laplacian_matrix, helmholtz_matrix = get_helmholtz_matrices!(kappa, omega, gamma; alpha=0.5)
+    h = 1.0./n
+
+    if axb == true
+        r_vcycle = zeros(c_type,n-1,n-1,1,1)
+        r_vcycle[floor(Int32,n / 2.0),floor(Int32,n / 2.0),1,1] = 1.0 ./mean(h.^2);
+    else
+        x_true = randn(c_type,n-1,n-1, 1, 1)
+        r_vcycle, _ = generate_r_vcycle!(n, kappa, omega, gamma, reshape(x_true,n-1,n-1,1,1))
+        r_vcycle = vec(r_vcycle)
+        for i = 2:blocks
+            x_true = randn(c_type,n-1,n-1, 1, 1)
+            r_vcycle1, _ = generate_r_vcycle!(n, kappa, omega, gamma, reshape(x_true,n-1,n-1,1,1))
+            r_vcycle = cat(r_vcycle, vec(r_vcycle1), dims=2)
+        end
+    end
+
+    coefficient = h^2
+
+    A(v) = vec(helmholtz_chain!(reshape(v, n-1, n-1, 1, 1), helmholtz_matrix; h=h))
+    function As(v)
+        res = vec(A(v[:,1]))
+        for i = 2:blocks
+            res = cat(res, vec(A(v[:,i])), dims=2)
+        end
+
+        return res
+    end
+
+    function M_Unet(r)
+        r = reshape(r, n-1, n-1)
+        rj = reshape(r, n-1, n-1)
+        e = zeros(c_type, n-1, n-1)
+        ej = zeros(c_type, n-1, n-1)
+
+        if after_vcycle != true
+            ej = jacobi_helmholtz_method!(n, h, e, r, helmholtz_matrix)
+            rj = r - reshape(A(ej), n-1, n-1)
+        end
+
+        input = complex_grid_to_channels!(reshape(rj , n-1, n-1, 1, 1) , n)
+        if arch == 1
+            input = cat(input, reshape(kappa, n-1, n-1, 1, 1), reshape(gamma, n-1, n-1, 1, 1), kappa_features, dims=3)
+            e_unet = (model.solve_subnet(u_type.(input)|>cgpu)|>cpu)
+        elseif arch == 2
+            input = cat(input, reshape(kappa, n-1, n-1, 1, 1), reshape(gamma, n-1, n-1, 1, 1), dims=3)
+            e_unet = (model.solve_subnet(u_type.(input)|>cgpu, kappa_features|>cgpu)|>cpu)
+        else
+            input = cat(input, reshape(kappa, n-1, n-1, 1, 1), reshape(gamma, n-1, n-1, 1, 1), dims=3)
+            e_unet = (model(u_type.(input)|>cgpu)|>cpu)
+        end
+
+        e_unet = reshape((e_unet[:,:,1,1] + im*e_unet[:,:,2,1]),n-1,n-1,1,1) .* coefficient
+        e = reshape(e_unet, n-1,n-1)
+
+        e = ej + e
+
+        if relax_jacobi == true
+            e = jacobi_helmholtz_method!(n, h, e, r, helmholtz_matrix)
+        end
+
+        if after_vcycle == true
+            e, = v_cycle_helmholtz!(n, h, e, r, kappa, omega, gamma; v2_iter = v2_iter, level = level)
+        end
+        return vec(e)
+    end
+
+    function M_Unets(rs)
+        res = M_Unet(rs[:,1])
+        for i = 2:blocks
+            res = cat(res, M_Unet(rs[:,i]), dims=2)
+        end
+
+        return res
+    end
+
+    function M(r)
+        e_vcycle = zeros(c_type,n-1,n-1)
+        e_vcycle, = v_cycle_helmholtz!(n, h, e_vcycle, reshape(r[:,1], n-1, n-1), kappa, omega, gamma; v2_iter = v2_iter, level = 3)
+        if after_vcycle == true
+            e_vcycle, = v_cycle_helmholtz!(n, h, e_vcycle, reshape(r[:,1], n-1, n-1), kappa, omega, gamma; v2_iter = v2_iter, level = 3)
+        end
+        res = vec(e_vcycle)
+        for i = 2:blocks
+            e_vcycle = zeros(c_type,n-1,n-1)
+            e_vcycle, = v_cycle_helmholtz!(n, h, e_vcycle, reshape(r[:,i], n-1, n-1), kappa, omega, gamma; v2_iter = v2_iter, level = 3)
+            if after_vcycle == true
+                e_vcycle, = v_cycle_helmholtz!(n, h, e_vcycle, reshape(r[:,i], n-1, n-1), kappa, omega, gamma; v2_iter = v2_iter, level = 3)
+            end
+            res = cat(res, vec(e_vcycle), dims=2)
+        end
+
+        return res
+    end
+
+    function SM(r)
+        e_vcycle = zeros(c_type,n-1,n-1)
+        e_vcycle, = v_cycle_helmholtz!(n, h, e_vcycle, reshape(r[:,1], n-1, n-1), kappa, omega, gamma; v2_iter = v2_iter, level = 3)
+        res = vec(e_vcycle)
+        for i = 2:blocks
+            e_vcycle = zeros(c_type,n-1,n-1)
+            e_vcycle, = v_cycle_helmholtz!(n, h, e_vcycle, reshape(r[:,i], n-1, n-1), kappa, omega, gamma; v2_iter = v2_iter, level = 3)
+            res = cat(res, vec(e_vcycle), dims=2)
+        end
+
+        return res
+    end
+
+    x_init = zeros(c_type,(n-1)*(n-1),blocks)
+    x3,flag3,err3,iter3,resvec3= KrylovMethods.blockFGMRES(As, r_vcycle, 3, tol=1e-30, maxIter=1,
+                                                    M=SM, X=x_init, out=-1,flexible=true)
+    i = 1
+    x1 = x3
+    x1,flag1,err1,iter1,resvec1 = KrylovMethods.blockFGMRES(As, r_vcycle, restrt, tol=1e-30, maxIter=max_iter,
+                                                            M=M_Unets, X =x1, out=-1,flexible=true)
+
+    x_init = zeros(c_type,(n-1)*(n-1),blocks)
+    x3,flag3,err3,iter3,resvec3= KrylovMethods.blockFGMRES(As, r_vcycle, 3, tol=1e-30, maxIter=1,
+                                                    M=SM, X=x_init, out=-1,flexible=true)
+    i = 1
+    x2 = x3
+    x2,flag2,err2,iter2,resvec2 = KrylovMethods.blockFGMRES(As, r_vcycle, restrt, tol=1e-30, maxIter=max_iter,
+                                                    M=M, X=x2, out=-1,flexible=true)
+
+    return cat([resvec3[end]],resvec1, dims=1), cat([resvec3[end]],resvec2,dims=1)
+end
+
+function unet_vs_vcycle_split_fgmres!(model, n, kappa, kappa_features, omega, gamma, x_true, after_vcycle, e_vcycle_input, kappa_input, gamma_input, restrt, max_iter, relax_jacobi; v2_iter=10, level=3, axb=false, norm_input=false, log_error=true, test_name="", before_jacobi=false, unet_in_vcycle=false, arch=1)
 
     shifted_laplacian_matrix, helmholtz_matrix = get_helmholtz_matrices!(kappa, omega, gamma; alpha=0.5)
     h = 1.0./n
     if axb == true
-        r_vcycle = helmholtz_chain!(x_true, helmholtz_matrix; h=h)
+        r_vcycle = zeros(c_type,n-1,n-1,1,1)
+        r_vcycle[floor(Int32,n / 2.0),floor(Int32,n / 2.0),1,1] = 1.0 ./mean(h.^2);
     else
         r_vcycle, _ = generate_r_vcycle!(n, kappa, omega, gamma, x_true)
     end
 
-    coefficient = h^2 # norm_input == true ? h^2 : 1.0
+    coefficient = h^2
+    df = DataFrame(Title=["Title"],EA=[1.0],RA=[1.0])
+    df_unet = DataFrame(Title=["Title"],E=[1.0],R=[1.0])
+    A(v) = vec(helmholtz_chain!(reshape(v, n-1, n-1, 1, 1), helmholtz_matrix; h=h))
+
+    function M_Unet(r)
+        r = reshape(r, n-1, n-1)
+        rj = reshape(r, n-1, n-1)
+        e = zeros(c_type, n-1, n-1)
+        ej = zeros(c_type, n-1, n-1)
+
+        if after_vcycle != true #before_jacobi == true
+            ej = jacobi_helmholtz_method!(n, h, e, r, helmholtz_matrix)
+            rj = r - reshape(A(ej), n-1, n-1)
+            if log_error == true && i == 5
+                @info "$(Dates.format(now(), "HH:MM:SS")) - r = $(norm(rj)) $(size(rj)) e= $(norm(ej)) $(size(ej))"
+            end
+        end
+
+        input = complex_grid_to_channels!(reshape(rj , n-1, n-1, 1, 1) , n)
+        if arch == 1
+            input = cat(input, reshape(kappa, n-1, n-1, 1, 1), reshape(gamma, n-1, n-1, 1, 1), kappa_features, dims=3)
+            e_unet = (model.solve_subnet(u_type.(input)|>cgpu)|>cpu)
+        else
+            input = cat(input, reshape(kappa, n-1, n-1, 1, 1), reshape(gamma, n-1, n-1, 1, 1), dims=3)
+            e_unet = (model.solve_subnet(u_type.(input)|>cgpu, kappa_features|>cgpu)|>cpu)
+        end
+
+        e_unet = reshape((e_unet[:,:,1,1] + im*e_unet[:,:,2,1]),n-1,n-1,1,1) .* coefficient
+        e = reshape(e_unet, n-1,n-1)
+
+        e = ej + e
+
+        if relax_jacobi == true
+            e = jacobi_helmholtz_method!(n, h, e, r, helmholtz_matrix)
+        end
+
+        if after_vcycle == true
+            e, = v_cycle_helmholtz!(n, h, e, r, kappa, omega, gamma; v2_iter = v2_iter, level = level)
+        end
+        log_error1 = false
+        if log_error1 == true
+            e_true = fgmres_v_cycle_helmholtz!(n, h, r, kappa, omega, gamma; restrt=30, maxIter=15)
+            error_complex = norm_diff!(e, e_true)
+            df.EA = [sqrt(real(error_complex)^2 + imag(error_complex)^2)]
+
+            residual_complex = norm_diff!(reshape(A(e), n-1, n-1), r)
+            df.RA = [sqrt(real(residual_complex)^2 + imag(residual_complex)^2)]
+
+            CSV.write("$(test_name) t_n=$(n) t_axb=$("$(axb)"[1]) t_norm=$("$(norm_input)"[1]) unet error.csv",
+                                df, delim = ';',append=true)
+        end
+        return vec(e)
+    end
+
+    function M(r)
+        r = reshape(r, n-1, n-1)
+        e_vcycle = zeros(c_type,n-1,n-1)
+        e_vcycle, = v_cycle_helmholtz!(n, h, e_vcycle, r, kappa, omega, gamma; v2_iter = v2_iter, level = 3)
+        if after_vcycle == true
+            e_vcycle, = v_cycle_helmholtz!(n, h, e_vcycle, r, kappa, omega, gamma; v2_iter = v2_iter, level = 3)
+        end
+        return vec(e_vcycle)
+    end
+
+    function SM(r)
+        r = reshape(r, n-1, n-1)
+        e_vcycle = zeros(c_type,n-1,n-1)
+        e_vcycle, = v_cycle_helmholtz!(n, h, e_vcycle, r, kappa, omega, gamma; v2_iter = v2_iter, level = 3)
+        return vec(e_vcycle)
+    end
+
+    function M_VU(r)
+        r = reshape(r, n-1, n-1)
+        e_vcycle = zeros(c_type,n-1,n-1)
+        if after_vcycle == true
+            e_vcycle, = v_cycle_helmholtz_unet!(model, n, h, e_vcycle, r, kappa, omega, gamma; alpha=0.05, v2_iter = 2, level = 2)
+        else
+            e_vcycle, = v_cycle_helmholtz_unet!(model, n, h, e_vcycle, r, kappa, omega, gamma; alpha=0.05, v2_iter = 1, level = 2)
+        end
+        return vec(e_vcycle)
+    end
+
+    x_init = zeros(c_type,n-1,n-1)
+    x3,flag3,err3,iter3,resvec3= KrylovMethods.fgmres(A, vec(r_vcycle), 3, tol=1e-30, maxIter=1,
+                                                    M=SM, x=vec(x_init), out=-1, flexible=true)
+    i = 1
+    if unet_in_vcycle == true
+        x1,flag1,err1,iter1,resvec1 = KrylovMethods.fgmres(A, vec(r_vcycle), restrt, tol=1e-30, maxIter=max_iter,
+                                                        M=M_VU, x=vec(x3), out=-1, flexible=true)
+    else
+        x1 = x3
+        resvec1 = zeros(restrt*max_iter)
+        for iteration in 1:max_iter
+            x1,flag1,err1,iter1,resvec = KrylovMethods.fgmres(A, vec(r_vcycle), restrt, tol=1e-30, maxIter=1,
+                                                            M=M_Unet, x=vec(x1), out=-1, flexible=true)
+            resvec1[restrt*(iteration-1)+1:restrt*iteration] = resvec
+            if log_error == true
+                e_true = fgmres_v_cycle_helmholtz!(n, h, r_vcycle, kappa, omega, gamma; restrt=30, maxIter=15)
+                error_complex = norm_diff!(reshape(x1,n-1,n-1), e_true)
+                df.EA = [sqrt(real(error_complex)^2 + imag(error_complex)^2)]
+
+                residual_complex = norm_diff!(reshape(A(x1), n-1, n-1), r_vcycle)
+                df.RA = [sqrt(real(residual_complex)^2 + imag(residual_complex)^2)]
+
+                CSV.write("$(test_name) t_n=$(n) t_axb=$("$(axb)"[1]) t_norm=$("$(norm_input)"[1]) unet error.csv",
+                                    df, delim = ';',append=true)
+            end
+        end
+    end
+
+    x_init = zeros(c_type,n-1,n-1)
+    x3,flag3,err3,iter3,resvec3= KrylovMethods.fgmres(A, vec(r_vcycle), 3, tol=1e-30, maxIter=1,
+                                                    M=SM, x=vec(x_init), out=-1, flexible=true)
+    i = 1
+    x2 = x3
+    resvec2 = zeros(restrt*max_iter)
+    for iteration in 1:max_iter
+        x2,flag2,err2,iter2,resvec = KrylovMethods.fgmres(A, vec(r_vcycle), restrt, tol=1e-30, maxIter=1,
+                                                    M=M, x=vec(x2), out=-1, flexible=true)
+        resvec2[restrt*(iteration-1)+1:restrt*iteration] = resvec
+        if log_error == true
+            e_true = fgmres_v_cycle_helmholtz!(n, h, r_vcycle, kappa, omega, gamma; restrt=30, maxIter=15)
+            error_complex = norm_diff!(reshape(x2,n-1,n-1), e_true)
+            df.EA = [sqrt(real(error_complex)^2 + imag(error_complex)^2)]
+
+            residual_complex = norm_diff!(reshape(A(x2), n-1, n-1), r_vcycle)
+            df.RA = [sqrt(real(residual_complex)^2 + imag(residual_complex)^2)]
+
+            CSV.write("$(test_name) t_n=$(n) t_axb=$("$(axb)"[1]) t_norm=$("$(norm_input)"[1]) vcycle error.csv",
+                                    df, delim = ';',append=true)
+        end
+    end
+    return cat([resvec3[end]],resvec1, dims=1), cat([resvec3[end]],resvec2,dims=1)
+end
+
+function unet_vs_vcycle_log!(model, n, kappa, omega, gamma, x_true, after_vcycle, e_vcycle_input, kappa_input, gamma_input, restrt, max_iter, relax_jacobi; v2_iter=10, level=3, axb=false, norm_input=false, log_error=true, test_name="", before_jacobi=false, unet_in_vcycle=false)
+
+    shifted_laplacian_matrix, helmholtz_matrix = get_helmholtz_matrices!(kappa, omega, gamma; alpha=0.5)
+    h = 1.0./n
+    if axb == true
+        r_vcycle = zeros(c_type,n-1,n-1,1,1)
+        r_vcycle[floor(Int32,n / 2.0),floor(Int32,n / 2.0),1,1] = 1.0 ./mean(h.^2);
+    else
+        r_vcycle, _ = generate_r_vcycle!(n, kappa, omega, gamma, x_true)
+    end
+
+    coefficient = h^2
     i = 0
     df = DataFrame(Title=["Title"],EB=[1.0],RB=[1.0],EA=[1.0],RA=[1.0])
     df_unet = DataFrame(Title=["Title"],E=[1.0],R=[1.0])
@@ -116,10 +429,12 @@ function unet_vs_vcycle!(model, n, kappa, omega, gamma, x_true, after_vcycle, e_
         e = zeros(c_type, n-1, n-1)
         ej = zeros(c_type, n-1, n-1)
 
-        if after_vcycle != true #before_jacobi == true
+        if after_vcycle != true # after_vcycle != true # after_vcycle != true #before_jacobi == true
             ej = jacobi_helmholtz_method!(n, h, e, r, helmholtz_matrix)
+            # ej = jacobi_helmholtz_method!(n, h, ej, r, helmholtz_matrix)
             rj = r - reshape(A(ej), n-1, n-1)
-            if log_error == true && i == 5
+            log_error1 = false
+            if log_error1 == true && i == 5
                 @info "$(Dates.format(now(), "HH:MM:SS")) - r = $(norm(rj)) $(size(rj)) e= $(norm(ej)) $(size(ej))"
             end
         end
@@ -140,7 +455,8 @@ function unet_vs_vcycle!(model, n, kappa, omega, gamma, x_true, after_vcycle, e_
         e = reshape(e_unet, n-1,n-1)
 
         e = ej + e
-        if log_error == true && i == 5
+        log_error1 = false
+        if log_error1 == true && i == 5
             e_true = fgmres_v_cycle_helmholtz!(n, h, rj, kappa, omega, gamma)
             loss_e = loss!(e_unet, complex_grid_to_channels!(e_true, n))
             df.EB = [loss_e]
@@ -154,6 +470,7 @@ function unet_vs_vcycle!(model, n, kappa, omega, gamma, x_true, after_vcycle, e_
         end
 
         if relax_jacobi == true
+            e = jacobi_helmholtz_method!(n, h, e, r, helmholtz_matrix)
             e = jacobi_helmholtz_method!(n, h, e, r, helmholtz_matrix)
         end
 
@@ -200,102 +517,87 @@ function unet_vs_vcycle!(model, n, kappa, omega, gamma, x_true, after_vcycle, e_
         if after_vcycle == true
             e_vcycle, = v_cycle_helmholtz!(n, h, e_vcycle, r, kappa, omega, gamma; v2_iter = v2_iter, level = 3)
         end
-        #log_error = false
-        # if log_error == true && (i == 20 || i == 40 || i == 60)
-        #     e_true = fgmres_v_cycle_helmholtz!(n, h, r, kappa, omega, gamma)
-        #     loss_e = loss!(e_vcycle, e_true)
-        #
-        #     r_vcycle = reshape(A(e_vcycle), n-1, n-1)
-        #     loss_r = loss!(r_vcycle, r)
-        #
-        #     @info "$(Dates.format(now(), "HH:MM:SS")) - $(i) vcycle loss_e $(loss_e) $(loss!(e_vcycle ./ norm(e_vcycle), e_true ./ norm(e_true))) loss_r $(loss_r) $(loss!(r_vcycle ./ norm(r_vcycle), r)) e_true $(norm(e_true)) e_vcycle $(norm(e_vcycle))"
-        #     df_unet.E = [loss_e]
-        #     df_unet.R = [loss_r]
-        #     df_unet.Title = ["$(i) v=$("$(after_vcycle)"[1])"]
-        #     CSV.write("$(test_name) t_n=$(n) t_axb=$("$(axb)"[1]) t_norm=$("$(norm_input)"[1]) vcycle error.csv", df_unet, delim = ';',append=true)
-        # end
-        # i = i + 1
+        if log_error == true && (i == 20 || i == 40 || i == 60)
+            e_true = fgmres_v_cycle_helmholtz!(n, h, r, kappa, omega, gamma)
+            loss_e = loss!(e_vcycle, e_true)
+
+            r_vcycle = reshape(A(e_vcycle), n-1, n-1)
+            loss_r = loss!(r_vcycle, r)
+
+            @info "$(Dates.format(now(), "HH:MM:SS")) - $(i) vcycle loss_e $(loss_e) $(loss!(e_vcycle ./ norm(e_vcycle), e_true ./ norm(e_true))) loss_r $(loss_r) $(loss!(r_vcycle ./ norm(r_vcycle), r)) e_true $(norm(e_true)) e_vcycle $(norm(e_vcycle))"
+            df_unet.E = [loss_e]
+            df_unet.R = [loss_r]
+            df_unet.Title = ["$(i) v=$("$(after_vcycle)"[1])"]
+            CSV.write("$(test_name) t_n=$(n) t_axb=$("$(axb)"[1]) t_norm=$("$(norm_input)"[1]) vcycle error.csv", df_unet, delim = ';',append=true)
+        end
+        i = i + 1
+        return vec(e_vcycle)
+    end
+
+    function SM(r)
+        r = reshape(r, n-1, n-1)
+        e_vcycle = zeros(c_type,n-1,n-1)
+        e_vcycle, = v_cycle_helmholtz!(n, h, e_vcycle, r, kappa, omega, gamma; v2_iter = v2_iter, level = 3)
         return vec(e_vcycle)
     end
 
     x_init = zeros(c_type,n-1,n-1)
-    x3,flag3,err3,iter3,resvec3= KrylovMethods.fgmres(A, vec(r_vcycle), 3, tol=1e-30, maxIter=1,
-                                                    M=M, x=vec(x_init), out=-1, flexible=true)
+    # x3,flag3,err3,iter3,resvec3 = KrylovMethods.bicgstb(A, vec(r_vcycle); tol=1e-30, maxIter=3,
+    #                                                     M1=M, M2=x->copy(x),x=vec(x_init),out=-1)
+    x3,flag3,err3,iter3,resvec3 = KrylovMethods.fgmres(A, vec(r_vcycle), 3, tol=1e-30, maxIter=1,
+                                                    M=SM, x=vec(x_init), out=-1, flexible=true)
+
     i = 1
     if unet_in_vcycle == true
         x1,flag1,err1,iter1,resvec1 = KrylovMethods.fgmres(A, vec(r_vcycle), restrt, tol=1e-30, maxIter=max_iter,
                                                         M=M_VU, x=vec(x3), out=-1, flexible=true)
     else
-        x1,flag1,err1,iter1,resvec1 = KrylovMethods.fgmres(A, vec(r_vcycle), restrt, tol=1e-30, maxIter=max_iter,
-                                                        M=M_Unet, x=vec(x3), out=-1, flexible=true)
+        x1 = x3
+        resvec1 = zeros(restrt*max_iter)
+        for iteration in 1:max_iter
+            x1,flag1,err1,iter1,resvec = KrylovMethods.fgmres(A, vec(r_vcycle), restrt, tol=1e-30, maxIter=1,
+                                                            M=M_Unet, x=vec(x1), out=-1, flexible=true)
+            resvec1[restrt*(iteration-1)+1:restrt*iteration] = resvec
+            if log_error == true
+                e_true = fgmres_v_cycle_helmholtz!(n, h, r_vcycle, kappa, omega, gamma; restrt=30, maxIter=15)
+                error_complex = norm_diff!(reshape(x1,n-1,n-1), e_true)
+                df.EA = [sqrt(real(error_complex)^2 + imag(error_complex)^2)]
+
+                residual_complex = norm_diff!(reshape(A(x1), n-1, n-1), r_vcycle)
+                df.RA = [sqrt(real(residual_complex)^2 + imag(residual_complex)^2)]
+
+                CSV.write("$(test_name) t_n=$(n) t_axb=$("$(axb)"[1]) t_norm=$("$(norm_input)"[1]) unet error.csv",
+                                    df, delim = ';',append=true)
+            end
+        end
     end
 
     x_init = zeros(c_type,n-1,n-1)
     x3,flag3,err3,iter3,resvec3= KrylovMethods.fgmres(A, vec(r_vcycle), 3, tol=1e-30, maxIter=1,
-                                                    M=M, x=vec(x_init), out=-1, flexible=true)
+                                                    M=SM, x=vec(x_init), out=-1, flexible=true)
     i = 1
-    x2,flag2,err2,iter2,resvec2 = KrylovMethods.fgmres(A, vec(r_vcycle), restrt, tol=1e-30, maxIter=max_iter,
-                                                    M=M, x=vec(x3), out=-1, flexible=true)
+    x2 = x3
+    resvec2 = zeros(restrt*max_iter)
+    for iteration in 1:max_iter
+        x2,flag2,err2,iter2,resvec = KrylovMethods.fgmres(A, vec(r_vcycle), restrt, tol=1e-30, maxIter=1,
+                                                    M=M, x=vec(x2), out=-1, flexible=true)
+        resvec2[restrt*(iteration-1)+1:restrt*iteration] = resvec
+        if log_error == true
+            e_true = fgmres_v_cycle_helmholtz!(n, h, r_vcycle, kappa, omega, gamma; restrt=30, maxIter=15)
+            error_complex = norm_diff!(reshape(x2,n-1,n-1), e_true)
+            df.EA = [sqrt(real(error_complex)^2 + imag(error_complex)^2)]
 
-    return resvec1, resvec2
-end
+            residual_complex = norm_diff!(reshape(A(x2), n-1, n-1), r_vcycle)
+            df.RA = [sqrt(real(residual_complex)^2 + imag(residual_complex)^2)]
 
-function load_model!(test_name, e_vcycle_input, kappa_input, gamma_input;kernel=(3,3), model_type=SUnet, k_type=NaN, k_chs=-1, indexes=3, σ=elu)
-    model = create_model!(e_vcycle_input, kappa_input, gamma_input; kernel=kernel, type=model_type, k_type=k_type, k_chs=k_chs, indexes=indexes, σ=σ)
-    model = model|>cpu
-    @load "$(test_name).bson" model
-    @info "$(Dates.format(now(), "HH:MM:SS")) - Load Model"
-    model = model|>cgpu
-
-    return model
-end
-
-function check_model!(test_name, model, n, f, kappa, omega, gamma, e_vcycle_input, kappa_type, kappa_input, gamma_input, kernel, m, restrt, max_iter; v2_iter=10, level=3, smooth=false, k_kernel=3, threshold=50, axb=false, norm_input=false, before_jacobi=false, log_error=false, unet_in_vcycle=false, indexes=3, split=true)
-    unet_results = zeros(m,3,restrt*max_iter)
-    vcycle_results = zeros(m,2,restrt*max_iter)
-
-    # CSV.write("$(test_name) t_n=$(n) t_axb=$("$(axb)"[1]) t_norm=$("$(norm_input)"[1]) unet error.csv",
-    #                     DataFrame(Title=[],EB=[],RB=[],EA=[],RA=[]), delim = ';')
-    # CSV.write("$(test_name) t_n=$(n) t_axb=$("$(axb)"[1]) t_norm=$("$(norm_input)"[1]) vcycle error.csv",
-    #                     DataFrame(Title=[],E=[],R=[]), delim = ';')
-    # CSV.write("training set.csv", DataFrame(RR=[], RI=[], KAPPA=[], ER=[], EI=[]), delim = ';',append=true)
-
-    for i=1:m
-        x_true = randn(c_type,n-1,n-1, 1, 1)
-        kappa = generate_kappa!(n; type=kappa_type, smooth=smooth, threshold=threshold, kernel=k_kernel)
-        # heatmap(kappa, color=:grays)
-        # savefig("kappa $(i)")
-        kappa_features = NaN
-        if split == true
-            kappa_input = reshape(kappa, n-1, n-1, 1, 1)
-            if indexes != 3
-                kappa_input = cat(kappa_input, reshape(gamma, n-1, n-1, 1, 1), dims=3)
-            end
-            kappa_features = model.kappa_subnet(u_type.(kappa_input)|>cgpu)|>cpu
-            @info "$(Dates.format(now(), "HH:MM:SS")) - after kappa features $(size(kappa_features))"
+            CSV.write("$(test_name) t_n=$(n) t_axb=$("$(axb)"[1]) t_norm=$("$(norm_input)"[1]) vcycle error.csv",
+                                    df, delim = ';',append=true)
         end
-        resvec1, resvec2 = split == true ? unet_vs_vcycle_split!(model, n, kappa, kappa_features, omega, gamma, x_true, true, e_vcycle_input, kappa_input, gamma_input, restrt, max_iter, false; v2_iter=v2_iter, level=level, axb=axb, norm_input=norm_input, log_error=log_error, test_name=test_name, before_jacobi=before_jacobi, unet_in_vcycle=unet_in_vcycle) :
-                                    unet_vs_vcycle!(model, n, kappa, omega, gamma, x_true, true, e_vcycle_input, kappa_input, gamma_input, restrt, max_iter, false; v2_iter=v2_iter, level=level, axb=axb, norm_input=norm_input, log_error=log_error, test_name=test_name, before_jacobi=before_jacobi, unet_in_vcycle=unet_in_vcycle)
-        unet_results[i,1,:] = resvec1
-        vcycle_results[i,1,:] = resvec2
-        resvec1, resvec2 = split == true ? unet_vs_vcycle_split!(model, n, kappa, kappa_features, omega, gamma, x_true, false, e_vcycle_input, kappa_input, gamma_input, restrt, max_iter, false; v2_iter=v2_iter, level=level, axb=axb, norm_input=norm_input, log_error=log_error, test_name=test_name, before_jacobi=before_jacobi, unet_in_vcycle=unet_in_vcycle) :
-                                    unet_vs_vcycle!(model, n, kappa, omega, gamma, x_true, false, e_vcycle_input, kappa_input, gamma_input, restrt, max_iter, false; v2_iter=v2_iter, level=level, axb=axb, norm_input=norm_input, log_error=log_error, test_name=test_name, before_jacobi=before_jacobi, unet_in_vcycle=unet_in_vcycle)
-        unet_results[i,2,:] = resvec1
-        vcycle_results[i,2,:] = resvec2
-        resvec1, resvec2 = split == true ? unet_vs_vcycle_split!(model, n, kappa, kappa_features, omega, gamma, x_true, false, e_vcycle_input, kappa_input, gamma_input, restrt, max_iter, true; v2_iter=v2_iter, level=level, axb=axb, norm_input=norm_input, log_error=log_error, test_name=test_name, before_jacobi=before_jacobi, unet_in_vcycle=unet_in_vcycle) :
-                                    unet_vs_vcycle!(model, n, kappa, omega, gamma, x_true, false, e_vcycle_input, kappa_input, gamma_input, restrt, max_iter, true; v2_iter=v2_iter, level=level, axb=axb, norm_input=norm_input, log_error=log_error, test_name=test_name, before_jacobi=before_jacobi, unet_in_vcycle=unet_in_vcycle)
-        unet_results[i,3,:] = resvec1
     end
-    unet_vs_vcycle_graph!("$(test_name) t_n=$(n) t_axb=$("$(axb)"[1]) t_norm=$("$(norm_input)"[1])", #" t_j=$("$(before_jacobi)"[1])",
-                    mean(unet_results[:,1,:],dims=1)', mean(unet_results[:,2,:],dims=1)', mean(vcycle_results[:,1,:],dims=1)', mean(vcycle_results[:,2,:],dims=1)', mean(unet_results[:,3,:],dims=1)')
-
-    CSV.write("test/unet/results/$(test_name) t_n=$(n) t_axb=$("$(axb)"[1]) t_norm=$("$(norm_input)"[1]) preconditioner test.csv", # t_j=$("$(before_jacobi)"[1])
-                                                        DataFrame(VU=vec(mean(unet_results[:,1,:],dims=1)'),
-                                                                U=vec(mean(unet_results[:,2,:],dims=1)'),
-                                                                VV=vec(mean(vcycle_results[:,1,:],dims=1)'),
-                                                                V=vec(mean(vcycle_results[:,2,:],dims=1)'),
-                                                                JU=vec(mean(unet_results[:,3,:],dims=1)')), delim = ';')
+    return cat([resvec3[end]],resvec1, dims=1), cat([resvec3[end]],resvec2,dims=1)
 end
+
+# Another preconditioner tests:
 
 function check_full_solution_model!(test_name, model, n, f, kappa, omega, gamma, e_vcycle_input, kappa_type, kappa_input, gamma_input, kernel, m, restrt, max_iter; v2_iter=10, level=3, smooth=false, threshold=50, axb=false, norm_input=false)
     unet_results = zeros(m,restrt*max_iter-1)
@@ -333,6 +635,37 @@ function check_full_solution_model!(test_name, model, n, f, kappa, omega, gamma,
         end
     end
     CSV.write("test/unet/results/$(test_name) only unet.csv", DataFrame(U=vec(mean(unet_results[:,:],dims=1)')), delim = ';')
+end
+
+function unet_outof_gmres_graph!(title, vu_res, v_res, vv_res, vuv_res, vuj_res; after_vcycle=false, e_vcycle_input=false)
+    iterations = length(v_res)
+    iter = range(1, length=iterations)
+
+    factor = convergence_factor!(v_res)
+    factor_text = "v=$(factor)"
+    p = plot(iter,v_res,label="V $(factor)")
+
+    factor = convergence_factor!(vu_res)
+    factor_text = "$(factor_text) vu=$(factor)"
+    plot!(iter,vu_res,label="VU $(factor)")
+
+    factor = convergence_factor!(vuv_res)
+    factor_text = "$(factor_text) vuv=$(factor)"
+    plot!(iter,vuv_res,label="VUV $(factor)")
+
+    factor = convergence_factor!(vuj_res)
+    factor_text = "$(factor_text) vuj=$(factor)"
+    plot!(iter,vuj_res,label="VUJ $(factor)")
+
+    factor = convergence_factor!(vv_res)
+    factor_text = "$(factor_text) vv=$(factor)"
+    plot!(iter,vv_res,label="VV $(factor)")
+
+    yaxis!(L"\Vert b - Hx \Vert_2", :log10)
+    xlabel!("Iterations")
+
+    savefig("test/unet/results/$(title) $(factor_text)")
+    @info "$(Dates.format(now(), "HH:MM:SS")) - Convergence Factors : $(factor_text)"
 end
 
 function check_gmres_alternatively_model!(test_name, model, n, f, kappa, omega, gamma, e_vcycle_input, kappa_type, kappa_input, gamma_input, kernel, m, restrt, max_iter; v2_iter=10, level=3, smooth=false, threshold=50, axb=false, norm_input=false, before_jacobi=false)
@@ -373,7 +706,6 @@ function check_gmres_alternatively_model!(test_name, model, n, f, kappa, omega, 
             @info "VU $(i) $(j) x_unet $(norm(x_unet)) x_vcycle $(norm(x_vcycle)) r $(norm(r)) b_true $(norm(b_true))"
             x_vcycle = reshape(x_vcycle,n-1,n-1) + (x_unet[:,:,1,1] + im*x_unet[:,:,2,1])
             vu_results[i,5*(j-1)+1:5*(j-1)+5] = resvec
-            # @info "VU $(i) $(j) : $(vu_results[i,5*(j-1)+1])"
         end
         x_vcycle = zeros(c_type,n-1,n-1)
         for j = 1:max_iter
@@ -381,7 +713,6 @@ function check_gmres_alternatively_model!(test_name, model, n, f, kappa, omega, 
                                                             M=M, x=vec(x_vcycle), out=-1, flexible=true)
 
             v_results[i,5*(j-1)+1:5*(j-1)+5] = resvec
-            # @info "V $(i) $(j) : $(v_results[i,5*(j-1)+1])"
         end
         x_vcycle = zeros(c_type,n-1,n-1)
         for j = 1:max_iter
@@ -389,7 +720,6 @@ function check_gmres_alternatively_model!(test_name, model, n, f, kappa, omega, 
                                                             M=M, x=vec(x_vcycle), out=-1, flexible=true)
             x_vcycle, = v_cycle_helmholtz!(n, h, reshape(x_vcycle,n-1,n-1), reshape(b_true,n-1,n-1), kappa, omega, gamma; v2_iter = v2_iter, level = level)
             vv_results[i,5*(j-1)+1:5*(j-1)+5] = resvec
-            # @info "VV $(i) $(j) : $(vv_results[i,5*(j-1)+1])"
         end
         x_vcycle = zeros(c_type,n-1,n-1)
         for j = 1:max_iter
@@ -402,7 +732,6 @@ function check_gmres_alternatively_model!(test_name, model, n, f, kappa, omega, 
             x_vcycle = reshape(x_vcycle,n-1,n-1) + (x_unet[:,:,1,1] + im*x_unet[:,:,2,1])
             x_vcycle, = v_cycle_helmholtz!(n, h, x_vcycle, reshape(b_true,n-1,n-1), kappa, omega, gamma; v2_iter = v2_iter, level = level)
             vuv_results[i,5*(j-1)+1:5*(j-1)+5] = resvec
-            # @info "VUV $(i) $(j) : $(vuv_results[i,5*(j-1)+1])"
         end
         x_vcycle = zeros(c_type,n-1,n-1)
         for j = 1:max_iter
@@ -414,7 +743,6 @@ function check_gmres_alternatively_model!(test_name, model, n, f, kappa, omega, 
             x_vcycle = reshape(x_vcycle,n-1,n-1) + (x_unet[:,:,1,1] + im*x_unet[:,:,2,1])
             x_vcycle = jacobi_helmholtz_method!(n, h, x_vcycle, reshape(b_true,n-1,n-1), h_matrix)
             vuj_results[i,5*(j-1)+1:5*(j-1)+5] = resvec
-            # @info "VUJ $(i) $(j) : $(vuj_results[i,5*(j-1)+1])"
         end
     end
     unet_outof_gmres_graph!("$(test_name) t_n=$(n) t_axb=$("$(axb)"[1]) t_norm=$("$(norm_input)"[1]) t_j=$("$(before_jacobi)"[1])",
@@ -425,6 +753,8 @@ function check_point_source_problem!(test_name, model, n, kappa, omega, gamma, e
     b = zeros(c_type,n-1,n-1)
     h = 1.0 / n
     b[floor(Int32,n / 2.0),floor(Int32,n / 2.0)] = 1.0 ./ mean(h.^2);
+    full_sol = fgmres_v_cycle_helmholtz!(n, h, b, kappa, omega, gamma; restrt=30, maxIter=15)
+    shifted_laplacian_matrix, helmholtz_matrix = get_helmholtz_matrices!(kappa, omega, gamma; alpha=0.5)
     coefficient = h^2
 
     if e_vcycle_input == true
@@ -439,111 +769,40 @@ function check_point_source_problem!(test_name, model, n, kappa, omega, gamma, e
     input = gamma_input == true ? cat(input, gamma, dims=3) : input
 
     e_unet = model(u_type.(input)|>cgpu)
-    heatmap(e_unet[:,:,1,1]|>cpu, color=:grays)
+    heatmap(e_unet[:,:,1,1]|>cpu, color=:blues)
     savefig("test/unet/results/$(test_name) $(n) e unet")
+    CSV.write("test/unet/results/$(test_name) $(n) e unet.csv", DataFrame(E=vec(real(e_unet[:,:,1,1]))), delim = ';')
 
     x = zeros(c_type,n-1,n-1)
     x, = v_cycle_helmholtz!(n, h, x, b, kappa, omega, gamma; v2_iter=v2_iter, level=level)
-    heatmap(real(x), color=:grays)
+    heatmap(real(x), color=:blues)
     savefig("test/unet/results/$(test_name) $(n) e vcycle")
+    CSV.write("test/unet/results/$(test_name) $(n) e vcycle.csv", DataFrame(E=vec(real(x))), delim = ';')
+    ax = helmholtz_chain!(reshape(x,n-1,n-1,1,1), helmholtz_matrix; h=h)
+    @info "Vcycle error=$(norm_diff!(x,full_sol)) residual=$(norm_diff!(ax,b))"
 
     x, = v_cycle_helmholtz!(n, h, x, b, kappa, omega, gamma; v2_iter=v2_iter, level=level)
-    heatmap(real(x), color=:grays)
+    heatmap(real(x), color=:blues)
     savefig("test/unet/results/$(test_name) $(n) e vcycle vcycle")
+    CSV.write("test/unet/results/$(test_name) $(n) e vcycle vcycle.csv", DataFrame(E=vec(real(x))), delim = ';')
+    ax = helmholtz_chain!(reshape(x,n-1,n-1,1,1), helmholtz_matrix; h=h)
+    @info "Vcycle Vcycle error=$(norm_diff!(x,full_sol)) residual=$(norm_diff!(ax,b))"
 
     x = e_unet[:,:,1,1]+im*e_unet[:,:,2,1]
+    ax = helmholtz_chain!(reshape(x|>cpu,n-1,n-1,1,1), helmholtz_matrix; h=h)
+    @info "Unet error=$(norm_diff!(x|>cpu,full_sol)) residual=$(norm_diff!(ax,b))"
     x, = v_cycle_helmholtz!(n, h, x|>cpu, b, kappa, omega, gamma; v2_iter=v2_iter, level=level)
-    heatmap(real(x), color=:grays)
+    heatmap(real(x), color=:blues)
     savefig("test/unet/results/$(test_name) $(n) e vcycle unet")
-end
+    CSV.write("test/unet/results/$(test_name) $(n) e vcycle unet.csv", DataFrame(E=vec(real(x))), delim = ';')
+    ax = helmholtz_chain!(reshape(x,n-1,n-1,1,1), helmholtz_matrix; h=h)
+    @info "Vcycle Unet error=$(norm_diff!(x,full_sol)) residual=$(norm_diff!(ax,b))"
 
-function unet_vs_vcycle_split!(model, n, kappa, kappa_features, omega, gamma, x_true, after_vcycle, e_vcycle_input, kappa_input, gamma_input, restrt, max_iter, relax_jacobi; v2_iter=10, level=3, axb=false, norm_input=false, log_error=true, test_name="", before_jacobi=false, unet_in_vcycle=false)
-
-    shifted_laplacian_matrix, helmholtz_matrix = get_helmholtz_matrices!(kappa, omega, gamma; alpha=0.5)
-    h = 1.0./n
-    if axb == true
-        r_vcycle = helmholtz_chain!(x_true, helmholtz_matrix; h=h)
-    else
-        r_vcycle, _ = generate_r_vcycle!(n, kappa, omega, gamma, x_true)
-    end
-
-    coefficient = h^2
-    df = DataFrame(Title=["Title"],EB=[1.0],RB=[1.0],EA=[1.0],RA=[1.0])
-    df_unet = DataFrame(Title=["Title"],E=[1.0],R=[1.0])
-    A(v) = vec(helmholtz_chain!(reshape(v, n-1, n-1, 1, 1), helmholtz_matrix; h=h))
-
-    function M_Unet(r)
-        r = reshape(r, n-1, n-1)
-        rj = reshape(r, n-1, n-1)
-        e = zeros(c_type, n-1, n-1)
-        ej = zeros(c_type, n-1, n-1)
-
-        if after_vcycle != true #before_jacobi == true
-            ej = jacobi_helmholtz_method!(n, h, e, r, helmholtz_matrix)
-            rj = r - reshape(A(ej), n-1, n-1)
-            if log_error == true && i == 5
-                @info "$(Dates.format(now(), "HH:MM:SS")) - r = $(norm(rj)) $(size(rj)) e= $(norm(ej)) $(size(ej))"
-            end
-        end
-
-        input = complex_grid_to_channels!(reshape(rj , n-1, n-1, 1, 1) , n)
-        input = cat(input, reshape(kappa, n-1, n-1, 1, 1), reshape(gamma, n-1, n-1, 1, 1), kappa_features, dims=3)
-
-        e_unet = (model.solve_subnet(u_type.(input)|>cgpu)|>cpu)
-        e_unet = reshape((e_unet[:,:,1,1] + im*e_unet[:,:,2,1]),n-1,n-1,1,1) .* coefficient
-        e = reshape(e_unet, n-1,n-1)
-
-        e = ej + e
-
-        if relax_jacobi == true
-            e = jacobi_helmholtz_method!(n, h, e, r, helmholtz_matrix)
-        end
-
-        if after_vcycle == true
-            e, = v_cycle_helmholtz!(n, h, e, r, kappa, omega, gamma; v2_iter = v2_iter, level = level)
-        end
-        return vec(e)
-    end
-
-    function M(r)
-        r = reshape(r, n-1, n-1)
-        e_vcycle = zeros(c_type,n-1,n-1)
-        e_vcycle, = v_cycle_helmholtz!(n, h, e_vcycle, r, kappa, omega, gamma; v2_iter = v2_iter, level = 3)
-        if after_vcycle == true
-            e_vcycle, = v_cycle_helmholtz!(n, h, e_vcycle, r, kappa, omega, gamma; v2_iter = v2_iter, level = 3)
-        end
-        return vec(e_vcycle)
-    end
-
-    function M_VU(r)
-        r = reshape(r, n-1, n-1)
-        e_vcycle = zeros(c_type,n-1,n-1)
-        if after_vcycle == true
-            e_vcycle, = v_cycle_helmholtz_unet!(model, n, h, e_vcycle, r, kappa, omega, gamma; alpha=0.05, v2_iter = 2, level = 2)
-        else
-            e_vcycle, = v_cycle_helmholtz_unet!(model, n, h, e_vcycle, r, kappa, omega, gamma; alpha=0.05, v2_iter = 1, level = 2)
-        end
-        return vec(e_vcycle)
-    end
-
-    x_init = zeros(c_type,n-1,n-1)
-    x3,flag3,err3,iter3,resvec3= KrylovMethods.fgmres(A, vec(r_vcycle), 3, tol=1e-30, maxIter=1,
-                                                    M=M, x=vec(x_init), out=-1, flexible=true)
-    i = 1
-    if unet_in_vcycle == true
-        x1,flag1,err1,iter1,resvec1 = KrylovMethods.fgmres(A, vec(r_vcycle), restrt, tol=1e-30, maxIter=max_iter,
-                                                        M=M_VU, x=vec(x3), out=-1, flexible=true)
-    else
-        x1,flag1,err1,iter1,resvec1 = KrylovMethods.fgmres(A, vec(r_vcycle), restrt, tol=1e-30, maxIter=max_iter,
-                                                        M=M_Unet, x=vec(x3), out=-1, flexible=true)
-    end
-
-    x_init = zeros(c_type,n-1,n-1)
-    x3,flag3,err3,iter3,resvec3= KrylovMethods.fgmres(A, vec(r_vcycle), 3, tol=1e-30, maxIter=1,
-                                                    M=M, x=vec(x_init), out=-1, flexible=true)
-    i = 1
-    x2,flag2,err2,iter2,resvec2 = KrylovMethods.fgmres(A, vec(r_vcycle), restrt, tol=1e-30, maxIter=max_iter,
-                                                    M=M, x=vec(x3), out=-1, flexible=true)
-
-    return resvec1, resvec2
+    x = e_unet[:,:,1,1]+im*e_unet[:,:,2,1]
+    x = jacobi_helmholtz_method!(n, h, x|>cpu, b, helmholtz_matrix)
+    heatmap(real(x), color=:blues)
+    savefig("test/unet/results/$(test_name) $(n) e jacobi unet")
+    CSV.write("test/unet/results/$(test_name) $(n) e jacobi unet.csv", DataFrame(E=vec(real(x))), delim = ';')
+    ax = helmholtz_chain!(reshape(x,n-1,n-1,1,1), helmholtz_matrix; h=h)
+    @info "Jacobi Unet error=$(norm_diff!(x,full_sol)) residual=$(norm_diff!(ax,b))"
 end

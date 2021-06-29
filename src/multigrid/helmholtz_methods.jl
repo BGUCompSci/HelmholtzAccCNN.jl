@@ -134,7 +134,7 @@ function fgmres_v_cycle_helmholtz!(n, h, b, kappa, omega, gamma; restrt=30, maxI
     x,flag,err,iter,resvec = KrylovMethods.fgmres(A, vec(b), restrt, tol=1e-30, maxIter=maxIter,
                                                     M=M, x=vec(x), out=-1, flexible=true)
 
-    # @info "$(Dates.format(now(), "HH:MM:SS")) - fgmres_v_cycle_helmholtz : $(resvec[end])"
+    @info "$(Dates.format(now(), "HH:MM:SS")) - fgmres_v_cycle_helmholtz : $(resvec[end])"
     return reshape(x, n-1, n-1)
 end
 

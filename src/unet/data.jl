@@ -2,10 +2,10 @@ using CSV, DataFrames
 
 # x ← FGMRES(A=Helmholtz, M=V-Cycle, b, x = 0, maxIter = 1)
 function generate_vcycle!(n, kappa, omega, gamma, b; v2_iter=10, level=3, restrt=1)
-    _, helmholtz_matrix = get_helmholtz_matrices!(kappa, omega, gamma; alpha=0.5)
+    _, h_matrix = get_helmholtz_matrices!(kappa, omega, gamma; alpha=0.5)
     h = 1.0 ./ n
 
-    A(v) = vec(helmholtz_chain!(reshape(v, n-1, n-1, 1, 1), helmholtz_matrix; h=h))
+    A(v) = vec(helmholtz_chain!(reshape(v, n-1, n-1, 1, 1), h_matrix; h=h))
     function M(v)
         v = reshape(v, n-1, n-1)
         x = zeros(c_type,n-1,n-1)
@@ -23,13 +23,40 @@ function generate_vcycle!(n, kappa, omega, gamma, b; v2_iter=10, level=3, restrt
     return x_vcycle, x_vcycle_channels
 end
 
+# x ← FGMRES(A=Helmholtz, M=Jacobi, b, x = 0, maxIter = 1)
+function generate_jacobi!(n, kappa, omega, gamma, b; v2_iter=10, level=3, restrt=1)
+    sl_matrix, h_matrix = get_helmholtz_matrices!(kappa, omega, gamma; alpha=0.5)
+    h = 1.0 ./ n
+
+    A(v) = vec(helmholtz_chain!(reshape(v, n-1, n-1, 1, 1), h_matrix; h=h))
+    function M(v)
+        v = reshape(v, n-1, n-1)
+        x = zeros(c_type,n-1,n-1)
+        x = jacobi_helmholtz_method!(n, h, x, v, sl_matrix)
+        return vec(x)
+    end
+
+    x0 = zeros(c_type,n-1,n-1,1,1)
+    if restrt == -1
+        restrt = rand(1:10)
+    end
+    x_vcycle, = KrylovMethods.fgmres(A, vec(b), restrt, tol=1e-10, maxIter=1,
+                                                    M=M, x=vec(x0), out=-1, flexible=true)
+    x_vcycle_channels = complex_grid_to_channels!(x_vcycle, n)
+    return x_vcycle, x_vcycle_channels
+end
+
 # r ← Ax - A(FGMRES(A=Helmholtz, M=V-Cycle, b, x = 0, maxIter = 1))
-function generate_r_vcycle!(n, kappa, omega, gamma, x_true; v2_iter=10, level=3, restrt=1)
+function generate_r_vcycle!(n, kappa, omega, gamma, x_true; v2_iter=10, level=3, restrt=1, jac=false)
     _, helmholtz_matrix = get_helmholtz_matrices!(kappa, omega, gamma; alpha=0.5)
     h = 1.0 ./ n
     b_true = helmholtz_chain!(x_true, helmholtz_matrix; h=h)
 
-    x_vcycle, _ = generate_vcycle!(n, kappa, omega, gamma, b_true; v2_iter=v2_iter, level=level, restrt=restrt)
+    if jac == true
+        x_vcycle, _ = generate_jacobi!(n, kappa, omega, gamma, b_true; v2_iter=v2_iter, level=level, restrt=restrt)
+    else
+        x_vcycle, _ = generate_vcycle!(n, kappa, omega, gamma, b_true; v2_iter=v2_iter, level=level, restrt=restrt)
+    end
     x_vcycle = reshape(x_vcycle, n-1, n-1, 1, 1)
     e_true = x_true .- x_vcycle
     r_vcycle = b_true .- helmholtz_chain!(x_vcycle, helmholtz_matrix; h=h)
@@ -38,7 +65,7 @@ function generate_r_vcycle!(n, kappa, omega, gamma, x_true; v2_iter=10, level=3,
 end
 
 function generate_random_data!(m, n, kappa, omega, gamma; e_vcycle_input=true, v2_iter=10, level=3, data_augmentetion=false,
-                                                          kappa_type=1, threshold=50, kappa_input=true, kappa_smooth=false, k_kernel=3, axb=false, norm_input=false, gmres_restrt=1)
+                                                          kappa_type=1, threshold=50, kappa_input=true, kappa_smooth=false, k_kernel=3, axb=false, jac=false, norm_input=false, gmres_restrt=1)
     h = 1.0./n;
 
     dataset = Tuple[]
@@ -57,7 +84,7 @@ function generate_random_data!(m, n, kappa, omega, gamma; e_vcycle_input=true, v
             e_true = x_true
         else
             # Generate r,e
-            r_vcycle, e_true = generate_r_vcycle!(n, kappa, omega, gamma, x_true;restrt=gmres_restrt)
+            r_vcycle, e_true = generate_r_vcycle!(n, kappa, omega, gamma, x_true;restrt=gmres_restrt, jac=jac)
         end
 
         r_vcycle = (h^2) .* r_vcycle

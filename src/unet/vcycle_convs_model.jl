@@ -4,16 +4,14 @@ include("../../src/unet/utils.jl")
 
 function BatchNormWrap(out_ch)
     Chain(x->expand_dims(x,2)|>cgpu,
-	  BatchNorm(out_ch)|> cgpu,
-	  x->squeeze(x))|> cgpu
+	    BatchNorm(out_ch)|> cgpu,
+	    x->squeeze(x))|> cgpu
 end
 
 ConvDown(in_chs,out_chs,kernel = (5,5)) =
-  Chain(
-    #Conv(block_filter!(3, smooth_down_filter, in_chs), [0.0], stride=(2,2)),
-    Conv(kernel,in_chs=>out_chs,stride=(2,2), pad = 1;init=_random_normal),
-	BatchNorm(out_chs),
-	x->elu.(x,0.2f0))|> cgpu
+    Chain(Conv(kernel,in_chs=>out_chs,stride=(2,2), pad = 1;init=_random_normal),
+	    BatchNorm(out_chs),
+	    x->elu.(x,0.2f0))|> cgpu
 
 struct UNetUpBlock
   upsample
@@ -25,8 +23,6 @@ end
 
 UNetUpBlock(in_chs::Int, out_chs::Int; kernel = (5, 5), p = 0.5f0) =
     UNetUpBlock(Chain(x->elu.(x,0.2f0),
-                #ConvTranspose(block_filter!(3, smooth_up_filter, in_chs), [0.0], stride=(2,2)),
-                #ConvTranspose((1, 1),in_chs=>out_chs;init=_random_normal),
                 ConvTranspose(kernel, in_chs=>out_chs, stride=(2, 2), pad = 1;init=_random_normal),
                 BatchNorm(out_chs),
         		Dropout(p)))|> cgpu

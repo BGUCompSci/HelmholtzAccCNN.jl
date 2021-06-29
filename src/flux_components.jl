@@ -1,4 +1,3 @@
-
 smooth_up_filter = reshape((1/4) * [1 2 1;2 4.0 2;1 2 1],3,3,1,1)
 smooth_down_filter = reshape((1/16) * [1 2 1;2 4 2;1 2 1],3,3,1,1)
 laplacian_filter = reshape([0 -1 0;-1 4.0 -1;0 -1 0],3,3,1,1)
@@ -7,6 +6,14 @@ function block_filter!(filter_size, kernel, channels)
     w = zeros(filter_size, filter_size, channels, channels)
     for i in 1:channels
         w[:,:,i,i] = kernel
+    end
+    return w
+end
+
+function big_block_filter!(filter_size, kernel, channels)
+    w = u_type.(zeros(filter_size, filter_size, channels, channels))|>cgpu
+    for i in 1:channels
+        w[:,:,:,i] = u_type.(kernel)|>cgpu
     end
     return w
 end
