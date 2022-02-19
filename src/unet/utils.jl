@@ -52,15 +52,15 @@ function loss_bce(x, y)
   mean(bce(op, y))
 end
 
-function complex_grid_to_channels!(grid, n)
-    grid_channels = zeros(u_type, n-1, n-1, 2, 1)
+function complex_grid_to_channels!(grid)
+    grid_channels = CuArray{r_type}(undef, size(grid,1), size(grid,2), 2, 1)
     grid_channels[:, :, 1, :] = real(grid)
     grid_channels[:, :, 2, :] = imag(grid)
     return grid_channels
 end
 
-function complex_helmholtz_to_channels!(helmholtz_matrix, n)
-    helmholtz_channels = zeros(u_type, n-1, n-1, 2, 2)
+function complex_helmholtz_to_channels!(helmholtz_matrix)
+    helmholtz_channels = CuArray{r_type}(undef, size(grid,1), size(grid,2), 2, 2)
     helmholtz_channels[:,:,1,1] = real(helmholtz_matrix)
     helmholtz_channels[:,:,2,1] = -imag(helmholtz_matrix)
     helmholtz_channels[:,:,1,2] = imag(helmholtz_matrix)

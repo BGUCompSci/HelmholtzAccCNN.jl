@@ -10,17 +10,17 @@ include("../../src/multigrid/helmholtz_methods.jl");
 
 # Grid
 
-n=1024
+n = 256
 n_cells = [n,n];
 h = 1.0./n;
-src = [512,512]
+src = [128,128]
 
 b = zeros(ComplexF64,n-1,n-1)
 b[src[1],src[2]] = 1.0 ./mean(h.^2);
 
 # Parameters
 
-f = 40.0
+f = 20.0
 kappa = ones(Float64,tuple(n_cells .-1...))
 omega = 2*pi*f;
 
@@ -34,6 +34,8 @@ gamma = absorbing_layer!(gamma, pad_cells, omega);
 # V cycle
 
 x = x0 = zeros(ComplexF64,n-1,n-1)
+x = fgmres_v_cycle_helmholtz!(n, h, b, kappa, omega, gamma; restrt=30, maxIter=1)
+
 v1_iter = 1
 v2_iter = 20
 iterations = 1
@@ -90,8 +92,8 @@ yaxis!(L"\Vert b - Hx \Vert_2", :log10)
 xlabel!("Iterations")
 savefig(replace("test/multigrid_helmholtz/results/f=$(f) gamma_val=$(gamma_val) residual graph","."=>"_"))
 
-heatmap(real(x), color=:grays)
-savefig(replace("test/multigrid_helmholtz/results/f=$(f) gamma_val=$(gamma_val) result","."=>"_"))
+heatmap(reshape(real(x), n-1, n-1), color=:jet,size=(240,160))
+savefig(replace("test/multigrid_helmholtz/results/without gamma n=$(n) f=$(f) gamma_val=$(gamma_val) result","."=>"_"))
 
 show_last_residual = 0
 if show_last_residual == 1
