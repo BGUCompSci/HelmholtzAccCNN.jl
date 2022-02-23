@@ -123,7 +123,7 @@ function v_cycle_helmholtz!(n, m, h, x, b, h_matrix_level1, sl_matrix_level1, h_
         x_coarse = zeros(c_type,n_coarse-1, m_coarse-1)|>pu
 
         for i = 1:u
-            x_coarse, _ = v_cycle_helmholtz2!(n_coarse, m_coarse, h*2, x_coarse, residual_coarse, h_matrix_level1, sl_matrix_level1, h_matrix_level2, sl_matrix_level2, h_matrix_level3, sl_matrix_level3; use_gmres_alpha = use_gmres_alpha,
+            x_coarse, _ = v_cycle_helmholtz!(n_coarse, m_coarse, h*2, x_coarse, residual_coarse, h_matrix_level1, sl_matrix_level1, h_matrix_level2, sl_matrix_level2, h_matrix_level3, sl_matrix_level3; use_gmres_alpha = use_gmres_alpha,
                                                                     u=u, v1_iter=v1_iter, v2_iter=v2_iter, log=log, level = (level == nothing ? nothing : (level-1)))
         end
         x_coarse_matrix = reshape(x_coarse, n_coarse-1, m_coarse-1, 1, 1)
@@ -200,10 +200,10 @@ function fgmres_v_cycle_helmholtz!(n, m, h, b, kappa, omega, gamma; restrt=30, m
         return vec(x)
     end
     x = zeros(gmres_type,n-1,m-1)|>pu
-    x,flag,err,iter,resvec = flexible_gmres(A, vec(b), restrt, tol=1e-30, maxIter=maxIter,
+    x,flag,err,iter,resvec = fgmres_func(A, vec(b), restrt, tol=1e-30, maxIter=maxIter,
                                                     M=M, x=vec(x), out=-1, flexible=true)
 
-    return reshape(x, n-1, n-1)
+    return reshape(x, n-1, m-1)
 end
 
 
@@ -271,7 +271,7 @@ function v_cycle_helmholtz_unet!(model, n, h, x, b, kappa, omega, gamma; u = 1, 
             return vec(e)
         end
 
-        x,flag,err,iter,resvec = flexible_gmres(A_Coarsest, vec(b), v2_iter, tol=1e-15, maxIter=1,
+        x,flag,err,iter,resvec = fgmres_func(A_Coarsest, vec(b), v2_iter, tol=1e-15, maxIter=1,
                                                     M=M_Unet, x=vec(x), out=-1, flexible=true)
         x = reshape(x, n-1, n-1)
     end
