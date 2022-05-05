@@ -38,7 +38,7 @@ include("../../src/kappa_models.jl")
 include("../../src/gpu_krylov.jl")
 include("unet_test_utils.jl")
 
-fgmres_func = KrylovMethods.fgmres # gpu_flexible_gmres # 
+fgmres_func = KrylovMethods.fgmres # gpu_flexible_gmres #
 
 # Test Parameters
 
@@ -73,12 +73,11 @@ k_kernel = 5
 before_jacobi = false
 unet_in_vcycle = false
 
-n = m = 128 # 256 # 176 #
-# m = 512 # 400 #256 # 
+n = m = 128
 h = r_type(2.0 / (n+m))
-f = 10.0 # 30.0 # 20.0 # 15.0 # 
-restrt = 10 # 10 #  1
-max_iter = 80 # 20
+f = 10.0
+restrt = 10
+max_iter = 30
 kappa = r_type.(generate_kappa!(n, m; type=kappa_type, smooth=smooth, threshold=kappa_threshold, kernel=k_kernel)|>pu) #ones(r_type,n-1,n-1)
 omega = r_type(2*pi*f);
 gamma = gamma_val*2*pi * ones(r_type,size(kappa))
@@ -95,23 +94,20 @@ sm_test_name = "23_48_23_$(run_title)_b$(blocks)_m$(kappa_type)_f$(Int32(f))_$(r
 sm_test_name_r = "$(sm_test_name)_retrain"
 
 model = load_model!("../../models/$(test_name).bson", e_vcycle_input, kappa_input, gamma_input;kernel = kernel,model_type=model_type, k_type=k_type, resnet_type=resnet_type, k_chs=k_chs, indexes=indexes, σ=σ, arch=arch)
-# 128 - OK!!
+
 model_r128 = load_model!("../../models/23_48_23 128 100 10 30 5 f f -1 r=f.bson", e_vcycle_input, kappa_input, gamma_input;kernel = kernel,model_type=model_type, k_type=k_type, resnet_type=resnet_type, k_chs=k_chs, indexes=indexes, σ=σ, arch=arch)
 model_r256 = load_model!("../../models/23_48_23 10 blocks 256 300 10 20 3 f f -1 r=f.bson", e_vcycle_input, kappa_input, gamma_input;kernel = kernel,model_type=model_type, k_type=k_type, resnet_type=resnet_type, k_chs=k_chs, indexes=indexes, σ=σ, arch=arch)
 model_r512 = load_model!("../../models/23_48_23 10 blocks 512 500 20 30 3 f f -1 r=f.bson", e_vcycle_input, kappa_input, gamma_input;kernel = kernel,model_type=model_type, k_type=k_type, resnet_type=resnet_type, k_chs=k_chs, indexes=indexes, σ=σ, arch=arch)
 
-# #model, _ = model_tuning!(model, sm_test_name, kappa, omega, gamma, n, f, 50, bs, iter, 0.001, kappa_threshold, false, false, k_kernel, -1)
-# model1 = load_model!(test_name, e_vcycle_input, kappa_input, gamma_input;kernel = kernel,model_type=model_type, k_type=k_type, resnet_type=resnet_type, k_chs=k_chs, indexes=indexes, σ=σ, arch=arch)
 # model_r128, _ = model_tuning!(model1, sm_test_name, kappa, omega, gamma, n, m, f, retrain_size, bs, iter, 0.001, kappa_threshold, false, false, k_kernel, -1,kappa_type;residual_loss=false)
-# model_r128 = load_model!("../../models/23_48_23 10 blocks 256 300 10 20 3 f f -1 r=f.bson", e_vcycle_input, kappa_input, gamma_input;kernel = kernel,model_type=model_type, k_type=k_type, resnet_type=resnet_type, k_chs=k_chs, indexes=indexes, σ=σ, arch=arch)
 
 if point_sorce_results == false
     check_point_source_problem!("$(Dates.format(now(), "HH_MM_SS")) $(sm_test_name)", model, n, m, kappa, omega, gamma, e_vcycle_input, kappa_input, gamma_input; v2_iter=v2_iter, level=level)
 end
 if check_unet_as_preconditioner == true #gmres_alternatively_
     # check_model_times!(sm_test_name, model, n, m, f, kappa, omega, gamma, e_vcycle_input, kappa_type, kappa_input, gamma_input, kernel, dataset_size, restrt, max_iter; v2_iter=v2_iter, level=level, smooth=smooth, k_kernel=k_kernel, threshold=kappa_threshold, axb=axb, norm_input=norm_input, before_jacobi=false,log_error=false,unet_in_vcycle=unet_in_vcycle,indexes=indexes, arch=arch)
-    check_model_blockfgmres!(sm_test_name, model, n, m, f, kappa, omega, gamma, e_vcycle_input, kappa_type, kappa_input, gamma_input, kernel, dataset_size, restrt, max_iter; v2_iter=v2_iter, level=level, smooth=smooth, k_kernel=k_kernel, threshold=kappa_threshold, axb=axb, norm_input=norm_input, before_jacobi=false,log_error=false,unet_in_vcycle=unet_in_vcycle,indexes=indexes, arch=arch)
-    check_model_blockfgmres!(sm_test_name_r, model_r128, n, m, f, kappa, omega, gamma, e_vcycle_input, kappa_type, kappa_input, gamma_input, kernel, dataset_size, restrt, max_iter; v2_iter=v2_iter, level=level, smooth=smooth, k_kernel=k_kernel, threshold=kappa_threshold, axb=axb, norm_input=norm_input, before_jacobi=false,log_error=false,unet_in_vcycle=unet_in_vcycle,indexes=indexes, arch=arch)
+    check_model!(sm_test_name, model, n, m, f, kappa, omega, gamma, e_vcycle_input, kappa_type, kappa_input, gamma_input, kernel, dataset_size, restrt, max_iter; v2_iter=v2_iter, level=level, smooth=smooth, k_kernel=k_kernel, threshold=kappa_threshold, axb=axb, norm_input=norm_input, before_jacobi=false,log_error=false,unet_in_vcycle=unet_in_vcycle,indexes=indexes, arch=arch)
+    check_model!(sm_test_name_r, model_r128, n, m, f, kappa, omega, gamma, e_vcycle_input, kappa_type, kappa_input, gamma_input, kernel, dataset_size, restrt, max_iter; v2_iter=v2_iter, level=level, smooth=smooth, k_kernel=k_kernel, threshold=kappa_threshold, axb=axb, norm_input=norm_input, before_jacobi=false,log_error=false,unet_in_vcycle=unet_in_vcycle,indexes=indexes, arch=arch)
 end
 
 n = m = 256
@@ -125,7 +121,7 @@ gamma = gamma_val*2*pi * ones(r_type,size(kappa))
 gamma = r_type.((absorbing_layer!(gamma, pad_cells, omega))|>pu)
 bs = 10
 iter = 40
-#model, _ = model_tuning!(model, sm_test_name, kappa, omega, gamma, n, f, 50, bs, iter, 0.001, kappa_threshold, false, false, k_kernel, -1)
+# model, _ = model_tuning!(model, sm_test_name, kappa, omega, gamma, n, f, 50, bs, iter, 0.001, kappa_threshold, false, false, k_kernel, -1)
 # model, sm_test_name = model_tuning!(model, sm_test_name, kappa, omega, gamma, n, f,500, bs, iter, 0.001, kappa_threshold, false, false, k_kernel, -1;residual_loss=false)
 
 if point_sorce_results == false
@@ -133,8 +129,8 @@ if point_sorce_results == false
 end
 if check_unet_as_preconditioner == true
     # check_model_times!("$(sm_test_name)", model, n, m, f, kappa, omega, gamma, e_vcycle_input, kappa_type, kappa_input, gamma_input, kernel, dataset_size, restrt, max_iter; v2_iter=v2_iter, level=level, smooth=smooth, k_kernel=k_kernel, threshold=kappa_threshold, axb=axb, norm_input=norm_input, before_jacobi=false,log_error=false,unet_in_vcycle=unet_in_vcycle,indexes=indexes, arch=arch)
-    check_model_blockfgmres!(sm_test_name, model, n, m, f, kappa, omega, gamma, e_vcycle_input, kappa_type, kappa_input, gamma_input, kernel, dataset_size, restrt, max_iter; v2_iter=v2_iter, level=level, smooth=smooth, k_kernel=k_kernel, threshold=kappa_threshold, axb=axb, norm_input=norm_input, before_jacobi=false,log_error=false,unet_in_vcycle=unet_in_vcycle,indexes=indexes, arch=arch)
-    check_model_blockfgmres!(sm_test_name_r, model_r256, n, m, f, kappa, omega, gamma, e_vcycle_input, kappa_type, kappa_input, gamma_input, kernel, dataset_size, restrt, max_iter; v2_iter=v2_iter, level=level, smooth=smooth, k_kernel=k_kernel, threshold=kappa_threshold, axb=axb, norm_input=norm_input, before_jacobi=false,log_error=false,unet_in_vcycle=unet_in_vcycle,indexes=indexes, arch=arch)
+    check_model!(sm_test_name, model, n, m, f, kappa, omega, gamma, e_vcycle_input, kappa_type, kappa_input, gamma_input, kernel, dataset_size, restrt, max_iter; v2_iter=v2_iter, level=level, smooth=smooth, k_kernel=k_kernel, threshold=kappa_threshold, axb=axb, norm_input=norm_input, before_jacobi=false,log_error=false,unet_in_vcycle=unet_in_vcycle,indexes=indexes, arch=arch)
+    check_model!(sm_test_name_r, model_r256, n, m, f, kappa, omega, gamma, e_vcycle_input, kappa_type, kappa_input, gamma_input, kernel, dataset_size, restrt, max_iter; v2_iter=v2_iter, level=level, smooth=smooth, k_kernel=k_kernel, threshold=kappa_threshold, axb=axb, norm_input=norm_input, before_jacobi=false,log_error=false,unet_in_vcycle=unet_in_vcycle,indexes=indexes, arch=arch)
 end
 
 n = m = 512
@@ -148,7 +144,7 @@ gamma = gamma_val*2*pi * ones(r_type,size(kappa))
 gamma = r_type.(absorbing_layer!(gamma, pad_cells, omega))|>pu
 bs = 20
 iter = 40
-#model, _ = model_tuning!(model, sm_test_name, kappa, omega, gamma, n, f, 50, bs, iter, 0.001, kappa_threshold, false, false, k_kernel, -1)
+# model, _ = model_tuning!(model, sm_test_name, kappa, omega, gamma, n, f, 50, bs, iter, 0.001, kappa_threshold, false, false, k_kernel, -1)
 # model, sm_test_name = model_tuning!(model, sm_test_name, kappa, omega, gamma, n, f, 500, bs, iter, 0.001, kappa_threshold, false, false, k_kernel, -1;residual_loss=false)
 
 if point_sorce_results == false
@@ -156,6 +152,6 @@ if point_sorce_results == false
 end
 if check_unet_as_preconditioner == true
     # check_model_times!("$(sm_test_name)", model, n, m, f, kappa, omega, gamma, e_vcycle_input, kappa_type, kappa_input, gamma_input, kernel, dataset_size, restrt, max_iter; v2_iter=v2_iter, level=level, smooth=smooth, k_kernel=k_kernel, threshold=kappa_threshold, axb=axb, norm_input=norm_input, before_jacobi=false,log_error=false,unet_in_vcycle=unet_in_vcycle,indexes=indexes, arch=arch)
-    check_model_blockfgmres!(sm_test_name, model, n, m, f, kappa, omega, gamma, e_vcycle_input, kappa_type, kappa_input, gamma_input, kernel, dataset_size, restrt, max_iter; v2_iter=v2_iter, level=level, smooth=smooth, k_kernel=k_kernel, threshold=kappa_threshold, axb=axb, norm_input=norm_input, before_jacobi=false,log_error=false,unet_in_vcycle=unet_in_vcycle,indexes=indexes, arch=arch)
-    check_model_blockfgmres!(sm_test_name_r, model_r512, n, m, f, kappa, omega, gamma, e_vcycle_input, kappa_type, kappa_input, gamma_input, kernel, dataset_size, restrt, max_iter; v2_iter=v2_iter, level=level, smooth=smooth, k_kernel=k_kernel, threshold=kappa_threshold, axb=axb, norm_input=norm_input, before_jacobi=false,log_error=false,unet_in_vcycle=unet_in_vcycle,indexes=indexes, arch=arch)
+    check_model!(sm_test_name, model, n, m, f, kappa, omega, gamma, e_vcycle_input, kappa_type, kappa_input, gamma_input, kernel, dataset_size, restrt, max_iter; v2_iter=v2_iter, level=level, smooth=smooth, k_kernel=k_kernel, threshold=kappa_threshold, axb=axb, norm_input=norm_input, before_jacobi=false,log_error=false,unet_in_vcycle=unet_in_vcycle,indexes=indexes, arch=arch)
+    check_model!(sm_test_name_r, model_r512, n, m, f, kappa, omega, gamma, e_vcycle_input, kappa_type, kappa_input, gamma_input, kernel, dataset_size, restrt, max_iter; v2_iter=v2_iter, level=level, smooth=smooth, k_kernel=k_kernel, threshold=kappa_threshold, axb=axb, norm_input=norm_input, before_jacobi=false,log_error=false,unet_in_vcycle=unet_in_vcycle,indexes=indexes, arch=arch)
 end

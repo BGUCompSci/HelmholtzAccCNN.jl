@@ -24,8 +24,6 @@ block_laplacian_filter = block_filter!(3, laplacian_filter, 2)
 up = ConvTranspose(smooth_up_filter, r_type.([0.0]), stride=2)|> pu
 down = Conv(smooth_down_filter, r_type.([0.0]), stride=2)|> pu
 
-# down64 = Flux.fmap(cfun, down)
-
 block_up = ConvTranspose(block_filter!(3, smooth_up_filter, 2), r_type.([0.0]), stride=2)
 block_down = Conv(block_filter!(3, smooth_down_filter, 2), r_type.([0.0]), stride=2)
 

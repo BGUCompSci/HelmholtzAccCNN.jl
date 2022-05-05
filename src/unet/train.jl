@@ -228,14 +228,7 @@ function train_residual_unet!(model, test_name, n, m, f, kappa, omega, gamma,
 
     @info "$(Dates.format(now(), "HH:MM:SS")) - Start Train $(test_name)"
 
-    if data_path == "gmres"
-        train_set = generate_gmres_data!(train_size, n, m, kappa, omega, gamma;
-                                                e_vcycle_input=e_vcycle_input, v2_iter=v2_iter, level=level, data_augmentetion =data_augmentetion,
-                                                kappa_type=kappa_type, threshold=threshold, kappa_input=kappa_input, kappa_smooth=kappa_smooth, axb=axb, norm_input=norm_input)
-        test_set = generate_gmres_data!(test_size, n, m, kappa, omega, gamma;
-                                                e_vcycle_input=e_vcycle_input, v2_iter=v2_iter, level=level,
-                                                kappa_type=kappa_type, threshold=threshold, kappa_input=kappa_input, kappa_smooth=kappa_smooth, axb=axb, norm_input=norm_input)
-    elseif data_path != ""
+    if data_path != ""
         train_set = get_csv_set!(data_path, n, train_size)
         test_set = get_csv_set!(data_path, n, test_size)
     else
