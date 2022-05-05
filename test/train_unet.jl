@@ -21,17 +21,22 @@ else
     pyplot()
 end
 
+pu = cpu # gpu
 r_type = Float32
 c_type = ComplexF32
 u_type = Float32
+gmres_type = ComplexF64
+a_type = CuArray{gmres_type}
+a_type = Array{gmres_type}
 
-include("../../src/multigrid/helmholtz_methods.jl")
-include("../../src/unet/model.jl")
-include("../../src/unet/data.jl")
-include("../../src/unet/train.jl")
-include("../../src/kappa_models.jl")
-include("unet_test_utils.jl")
+include("../src/multigrid/helmholtz_methods.jl")
+include("../src/unet/model.jl")
+include("../src/unet/data.jl")
+include("../src/unet/train.jl")
+include("../src/kappa_models.jl")
+include("test_utils.jl")
 
+fgmres_func = KrylovMethods.fgmres # gpu_flexible_gmres #
 
 function test_train_unet!(n, f, opt, init_lr, train_size, test_size, batch_size, iterations;
                                     is_save=false, data_augmentetion=false, e_vcycle_input=false,
@@ -40,19 +45,20 @@ function test_train_unet!(n, f, opt, init_lr, train_size, test_size, batch_size,
                                     axb=false, norm_input=false, model_type=SUnet, k_type=NaN, resnet_type=SResidualBlock, k_chs=-1, indexes=3, data_path="", full_loss=false, residual_loss=false, gmres_restrt=1, σ=elu, arch=1)
 
     h = 1.0./n;
-    kappa = ones(r_type,n-1,n-1)
-    omega = 2*pi*f;
     gamma_val = 0.00001
-    gamma = gamma_val * 2 * pi * ones(r_type,size(kappa));
     pad_cells = [10;10]
-    gamma = absorbing_layer!(gamma, pad_cells, omega);
+    kappa = r_type.(ones(r_type,n-1,n-1)|>pu)
+    omega = r_type(2*pi*f);
+    gamma = gamma_val*2*pi * ones(r_type,size(kappa))
+    gamma = r_type.(absorbing_layer!(gamma, pad_cells, omega))|>pu
     test_name = replace("$(Dates.format(now(), "HH_MM_SS")) RADAM ND $(model_type) $(k_type) $(resnet_type) $(k_chs) $(σ) $(indexes) $(k_kernel) g=$(gmres_restrt) t=$(u_type) g=$("$(gamma_input)"[1]) e=$("$(e_vcycle_input)"[1]) r=$("$(residual_loss)"[1]) k=$(kappa_type) $(threshold) n=$(n) f=$(f) m=$(train_size) bs=$(batch_size) lr=$(init_lr) each=$(smaller_lr) i=$(iterations)","."=>"_")
     model = create_model!(e_vcycle_input, kappa_input, gamma_input; kernel=kernel, type=model_type, k_type=k_type, resnet_type=resnet_type, k_chs=k_chs, indexes=indexes, σ=σ, arch=arch)|>cgpu
-    model, train_loss, test_loss = train_residual_unet!(model, test_name, n, f, kappa, omega, gamma,
+
+    model, train_loss, test_loss = train_residual_unet!(model, test_name, n, n, f, kappa, omega, gamma,
                                                         train_size, test_size, batch_size, iterations, init_lr;
                                                         e_vcycle_input=e_vcycle_input, v2_iter=v2_iter, level=level, data_augmentetion=data_augmentetion,
                                                         kappa_type=kappa_type, threshold=threshold, kappa_input=kappa_input, kappa_smooth=kappa_smooth, k_kernel=k_kernel,
-                                                        gamma_input=gamma_input, kernel=kernel, smaller_lr=smaller_lr, axb=axb, norm_input=norm_input, model_type=model_type, k_type=k_type, k_chs=k_chs, indexes=indexes,
+                                                        gamma_input=gamma_input, kernel=kernel, smaller_lr=smaller_lr, axb=axb, jac=false, norm_input=norm_input, model_type=model_type, k_type=k_type, k_chs=k_chs, indexes=indexes,
                                                         data_path=data_path, full_loss=full_loss, residual_loss=residual_loss, gmres_restrt=gmres_restrt,σ=σ)
 
     iter = range(1, length=iterations)

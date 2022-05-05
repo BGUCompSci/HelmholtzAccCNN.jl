@@ -6,7 +6,7 @@ using KrylovMethods
 using Plots
 pyplot()
 
-include("../../src/multigrid/helmholtz_methods.jl");
+include("../src/multigrid/helmholtz_methods.jl");
 
 # Grid
 
