@@ -4,7 +4,6 @@ using LaTeXStrings
 using BSON: @load
 using Dates
 pyplot()
-include("../test/unet/unet_test_utils.jl")
 
 # Fonts:
 
@@ -16,7 +15,7 @@ fonts = Dict(:guidefont=>bfont, :xtickfont=>sfont, :ytickfont=>sfont, :legendfon
 
 # Loss graphs:
 
-function loss_csv_to_graph!(title, path)
+function loss_graph!(title, path)
 
     fonts = Dict(:guidefont=>bfont, :xtickfont=>bfont, :ytickfont=>bfont, :legendfont=>bfont)
     df = DataFrame(CSV.File(path))
@@ -26,38 +25,15 @@ function loss_csv_to_graph!(title, path)
 
     ylabel!("loss")
     xlabel!("epochs")
-    savefig("C:/Siga/Repositories/HelmholtzAccCNN.jl/paper/temp/$(title)")
-    savefig("C:/Siga/Repositories/HelmholtzAccCNN.jl/paper/temp/$(title).eps")
+    savefig("../paper/$(title)")
+    savefig("../paper/$(title).eps")
 end
 
-loss_csv_to_graph!("08_39_27_0_r", "C:/Siga/Repositories/HelmholtzAccCNN.jl/graphs/16.06/08_39_27 RADAM ND SDNUnet NaN SResidualBlock 10 elu 3 5 g=-1 t=Float32 g=t e=f r=f k=0 25 n=128 f=10_0 m=20000 bs=20 lr=0_0001 each=48 i=80 loss.csv")
+path = ""
+title = ""
+loss_graph!(title, path)
 
-function multi_errors_loss_csv_to_graph!(title, path)
-    df = CSV.read(path)
-
-    iter = range(1, length=length(df.Train))
-    p = plot(iter, df.Train, label="Full Train Loss")
-    # plot!(iter, df.Test, label="Full Test Loss")
-    plot!(iter, df.Train_U1, label="U1 Train Loss")
-    # plot!(iter, df.Test_U1, label="U1 Test Loss")
-    plot!(iter, df.Train_J1, label="J1 Train Loss")
-    # plot!(iter, df.Test_J1, label="J1 Test Loss")
-    plot!(iter, df.Train_U2, label="U2 Train Loss")
-    # plot!(iter, df.Test_U2, label="U2 Test Loss")
-    plot!(iter, df.Train_J2, label="J2 Train Loss")
-    # plot!(iter, df.Test_J2, label="J2 Test Loss")
-    plot!(iter, df.Train_U3, label="U3 Train Loss")
-    # plot!(iter, df.Test_U3, label="U3 Test Loss")
-    plot!(iter, df.Train_J3, label="J3 Train Loss")
-    # plot!(iter, df.Test_J3, label="J3 Test Loss")
-    yaxis!(L"\Vert e^{true} -e^{net} \Vert_2", :log10)
-    xlabel!("iterations")
-    savefig("test/unet/results/$(title) residual graph")
-end
-
-multi_errors_loss_csv_to_graph!("23_30_11 Full Loss 4 50 2 bs=25", "graphs/23_30_11 DNUnet j=f axb=f norm=f to 1 t=Float32 k=3 50 g=t e=f da=f k=2 n=128 f=10_0 m=20000 bs=25 opt=ADAM lr=5_0e-5 each=25 i=100 loss.csv")
-
-function multi_loss_csv_to_graph!(title, l25, l50)
+function kappa_threshold_loss_graph!(title, l25, l50)
     fonts = Dict(:guidefont=>bfont, :xtickfont=>bfont, :ytickfont=>bfont, :legendfont=>bfont)
     iterations = 125
     iter = range(1, length=iterations)
@@ -66,16 +42,15 @@ function multi_loss_csv_to_graph!(title, l25, l50)
 
     ylabel!("loss")
     xlabel!("epochs")
-    savefig("C:/Siga/Repositories/HelmholtzAccCNN.jl/paper/temp/$(title)")
-    savefig("C:/Siga/Repositories/HelmholtzAccCNN.jl/paper/temp/$(title).eps")
+    savefig("../paper/$(title)")
+    savefig("../paper/$(title).eps")
 end
 
-path50 = "C:/Siga/Repositories/HelmholtzAccCNN.jl/graphs/csv/09_40_06 SDNUnet1 g=-1 t=Float32 g=t e=f k=0 50 n=128 f=10_0 m=20000 bs=20 lr=0_0001 each=70 i=155 loss.csv"
-path25 = "C:/Siga/Repositories/HelmholtzAccCNN.jl/graphs/csv/13_48_25 SDNUnet1 NaN -1 g=-1 t=Float32 g=t e=f k=0 25 n=128 f=10_0 m=25000 bs=20 lr=0_0001 each=60 i=125 loss.csv"
-title = "09_40_06_13_48_25_4_r"
-df25 = DataFrame(CSV.File(path25))
-df50 = DataFrame(CSV.File(path50))
-multi_loss_csv_to_graph!(title, df25.Train, df50.Train)
+path = ""
+title = ""
+df25 = DataFrame(CSV.File(path))
+df50 = DataFrame(CSV.File(path))
+kappa_threshold_loss_graph!(title, df25.Train, df50.Train)
 
 function loss_error_residual_to_graph!(title, path)
     fonts = Dict(:guidefont=>bfont, :xtickfont=>bfont, :ytickfont=>bfont, :legendfont=>bfont)
@@ -87,23 +62,27 @@ function loss_error_residual_to_graph!(title, path)
 
     ylabel!("loss")
     xlabel!("epochs")
-    savefig("C:/Siga/Repositories/HelmholtzAccCNN.jl/paper/temp/$(title) residual graph")
+    savefig("../paper/$(title) residual graph")
 end
 
-loss_error_residual_to_graph!("23_10_00 RADAM ND SDNUnet NaN SResidualBlock 0 r=t", "graphs/16.06/23_10_00 RADAM ND SDNUnet NaN SResidualBlock 10 elu 3 5 g=-1 t=Float32 g=t e=f r=t k=0 25 n=128 f=10_0 m=20000 bs=20 lr=0_0001 each=24 i=50 loss.csv")
+path = ""
+title = ""
+loss_error_residual_to_graph!(title, path)
 
 # Heatmaps:
 
-function csv_to_heatmap!(title, path, n)
+function csv_to_heatmap!(title, path, n, m)
     df = DataFrame(CSV.File(path))
-    heatmap(reshape(df.E, n-1, n-1), color=:jet,size=(240,160))
-    savefig("C:/Siga/Repositories/HelmholtzAccCNN.jl/paper/$(title)")
+    heatmap(reshape(df.K, n-1, m-1), color=:jet,size=(200*m/n,200))
+    savefig("C:/Siga/Repositories/HelmholtzAccCNN.jl/temp/graphs/$(title)")
 end
 
-csv_to_heatmap!("13_48_25 SDNUnet1 NaN 128 4 25 e vcycle unet", "C:/Siga/Repositories/HelmholtzAccCNN.jl/graphs/14.06/13_48_25 SDNUnet1 NaN -1 g=-1 t=Float32 g=t e=f k=0 25 n=128 f=10_0 m=25000 bs=20 lr=0_0001 each=60 i=125 128 e vcycle unet.csv", 128)
+path = ""
+csv_to_heatmap!("kappa_7", path, 256, 512)
+csv_to_heatmap!("kappa_6", path, 176, 400)
+csv_to_heatmap!("kappa_5", path, 128, 256)
 
 # Preconditioner tset graphs:
-
 
 function unet_vs_vcycle_graph!(title, vu, v, ju; after_vcycle=false, e_vcycle_input=false)
     iterations = 15 #length(v)
@@ -124,11 +103,11 @@ function unet_vs_vcycle_graph!(title, vu, v, ju; after_vcycle=false, e_vcycle_in
     yaxis!(L"\Vert b - Hx \Vert_2", :log10)
     xlabel!("iterations")
 
-    savefig("C:/Siga/Repositories/HelmholtzAccCNN.jl/paper/temp/$(title)")
-    savefig("C:/Siga/Repositories/HelmholtzAccCNN.jl/paper/temp/$(title).eps")
+    savefig("../paper/$(title)")
+    savefig("../paper/$(title).eps")
 end
 
-path = "C:/Siga/Repositories/HelmholtzAccCNN.jl/graphs/22.06/08_39_27 RADAM ND SDNUnet NaN SResidualBlock 10 elu 3 5 g=-1 t=Float32 g=t e=f r=f k=0 25 n=128 f=10_0 m=20000 bs=20 lr=0_0001 each=48 i=80 t_n=128 t_axb=t t_norm=f preconditioner test.csv"
+path = ""
 title = "08_39_27 SDNUnet 0 128"
 df = DataFrame(CSV.File(path))
 unet_vs_vcycle_graph!("$(title) preconditioner test", df.VU, df.V, df.JU)
@@ -150,7 +129,7 @@ function convergence_factor_106!(vector)
     end
 end
 
-function multi_unet_vs_vcycle_graph!(title, vu25, v25, ju25, vu50, v50, ju50; after_vcycle=false, e_vcycle_input=false)
+function kappa_threshold_unet_vs_vcycle_graph!(title, vu25, v25, ju25, vu50, v50, ju50; after_vcycle=false, e_vcycle_input=false)
     iterations = length(vc_unet_res)
     iter = range(1, length=iterations)
     fonts = Dict(:guidefont=>bfont, :xtickfont=>bfont, :ytickfont=>bfont, :legendfont=>sfont)
@@ -175,97 +154,259 @@ function multi_unet_vs_vcycle_graph!(title, vu25, v25, ju25, vu50, v50, ju50; af
     ylims!((10^-10,10^-1))
     xlabel!("iterations")
 
-    savefig("C:/Siga/Repositories/HelmholtzAccCNN.jl/paper/temp/$(title)")
-    savefig("C:/Siga/Repositories/HelmholtzAccCNN.jl/paper/temp/$(title).eps")
+    savefig("../paper/$(title)")
+    savefig("../paper/$(title).eps")
 end
 
-path50 = "C:/Siga/Repositories/HelmholtzAccCNN.jl/graphs/24.06/single/09_40_06 4 50 10 blocks 3 1 t_n=128 t_axb=f t_norm=f preconditioner test.csv"
-path25 = "C:/Siga/Repositories/HelmholtzAccCNN.jl/graphs/24.06/single/13_48_25 4 25 10 blocks 3 3 t_n=128 t_axb=f t_norm=f preconditioner test.csv"
-
+path50 = ""
 n = 128
 title = "09_40_06_13_48_25_4_$(n)_3"
-df25 = DataFrame(CSV.File(path25))
-df50 = DataFrame(CSV.File(path50))
-multi_unet_vs_vcycle_graph!("$(title)", df25.VU, df25.V, df25.JU, df50.VU, df50.V, df50.JU)
+df25 = DataFrame(CSV.File(path))
+df50 = DataFrame(CSV.File(path))
+kappa_threshold_unet_vs_vcycle_graph!("$(title)", df25.VU, df25.V, df25.JU, df50.VU, df50.V, df50.JU)
 
 function retrain_unet_vs_vcycle_graph!(title, vu, v, ju, vu_r, v_r, ju_r; after_vcycle=false, e_vcycle_input=false, len=60, v_factor=0.92)
     iterations = len # length(vu)
     iter = range(1, length=iterations)
     fonts = Dict(:guidefont=>bfont, :xtickfont=>bfont, :ytickfont=>bfont, :legendfont=>sfont)
 
-    factor = convergence_factor_106!(v_r)
+    factor,_ = convergence_factor_106!(v_r)
     factor_text = "v=$(factor)"
     p = plot(iter,v_r[1:iterations],label=L"\rho_V = " * "$(factor)",legend=:topright, w = 1.8,color="green",size=(500,400); fonts...)
-    factor = convergence_factor_106!(ju)
+    factor,_ = convergence_factor_106!(ju)
     factor_text = "$(factor_text) ju=$(factor)"
     plot!(iter,ju[1:iterations],label=L"\rho_{JU} = " * "$(factor)", w = 1.8,color="blue")
-    factor = convergence_factor_106!(ju_r)
+    factor,_ = convergence_factor_106!(ju_r)
     factor_text = "$(factor_text) ju_r=$(factor)"
     plot!(iter,ju_r[1:iterations],label=L"\rho_{JU} = " * "$(factor);" * " re-train", w = 1.8,color="blue",linestyle=:dot)
-    factor = convergence_factor_106!(vu)
+    factor,_ = convergence_factor_106!(vu)
     factor_text = "$(factor_text) vu=$(factor)"
     plot!(iter,vu[1:iterations],label=L"\rho_{VU} = " * "$(factor)", w = 1.8,color="red")
-    factor  = convergence_factor_106!(vu_r)
+    factor,_  = convergence_factor_106!(vu_r)
     factor_text = "$(factor_text) vu_r=$(factor)"
     plot!(iter,vu_r[1:iterations],label=L"\rho_{VU} = " * "$(factor);" * " re-train", w = 1.8,color="red",linestyle=:dot)
 
     yaxis!("relative residual norm", :log10)
     ylims!((10^-10,10^-1))
     xlabel!("iterations")
-    savefig("C:/Siga/Repositories/HelmholtzAccCNN.jl/paper/temp/$(title)")
-    savefig("C:/Siga/Repositories/HelmholtzAccCNN.jl/paper/temp/$(title).eps")
+    savefig("../paper/$(title)")
+    savefig("../paper/$(title).eps")
 end
-
-original_p = "C:/Siga/Repositories/HelmholtzAccCNN.jl/graphs/24.06/uniform/09_40_06 t_n=128 t_axb=f t_norm=f preconditioner test.csv"
-retrain_p = "C:/Siga/Repositories/HelmholtzAccCNN.jl/graphs/24.06/uniform/09_40_06 t_n=128 t_axb=f t_norm=f preconditioner test.csv"
 
 n = 128
-axb = false
-thresh = 25
+path = ""
+original = DataFrame(CSV.File(path))
+retrain = DataFrame(CSV.File(path))
+title = "23_48_23_32_bit_cpu_m10r10_128"
+retrain_unet_vs_vcycle_graph!("$(title)",original.VU, original.V,original.JU, original.VU_T, original.V_T,original.JU_T;len=100)
 
-title = "09_40_06_vcycle_factors"
+function retrain_unet_vs_vcycle_graph_times!(title, vu, v, ju, vu_r, v_r, ju_r, vu_t, v_t, ju_t, vu_r_t, v_r_t, ju_r_t; xlim=20, sec=1, blocks=10)
+    iterations = length(vu)
+    iter = range(1, length=iterations)
+    fonts = Dict(:guidefont=>bfont, :xtickfont=>bfont, :ytickfont=>bfont, :legendfont=>sfont)
 
-# Const Model 0.887 118
-original = DataFrame(CSV.File(original_p))
-retrain = DataFrame(CSV.File(retrain_p))
-
-retrain_unet_vs_vcycle_graph!("$(title)",original.VU, original.V,original.JU, retrain.VU,retrain.V,retrain.JU;len=200)
-
-if thresh == 25
-    if n == 128
-        if axb == true
-            factor = 0.927 # 182
-        else
-            factor = 0.916 # 159
-        end
-    elseif n == 256
-        if axb == true
-            factor = 0.979 # 637
-        else
-            factor = 0.972 # 493
-        end
-    elseif n == 512
-        if axb == true
-            factor = 0.991 # 1520
-        else
-            factor = 0.987 # 1017
-        end
+    factor,T = convergence_factor_106!(v_r)
+    if T == 1001
+        T = 1018
     end
-else
-    if n == 128
-        if axb == true
-            factor = 0.887 # 115
-        else
-            factor = 0.879 # 108
-        end
-    elseif n == 256
-        if axb == true
-            factor = 0.979 # 637
-        else
-            factor = 0.972 # 493
-        end
+    factor_text = "v=$(factor)"
+    p = plot(v_r_t[1:iterations]./(blocks*sec),v_r[1:iterations],label=L"\rho_V = " * "$(factor);" * L" T = " * "$(T)",legend=:topright, w = 1.8,color="green",size=(500,400); fonts...)
+    factor,T = convergence_factor_106!(ju)
+    factor_text = "$(factor_text) ju=$(factor)"
+    plot!(ju_t[1:iterations]./(blocks*sec),ju[1:iterations],label=L"\rho_{JU} = " * "$(factor);" * L" T = " * "$(T)", w = 1.8,color="blue")
+    factor,T = convergence_factor_106!(ju_r)
+    factor_text = "$(factor_text) ju_r=$(factor)"
+    plot!(ju_r_t[1:iterations]./(blocks*sec),ju_r[1:iterations],label=L"\rho_{JU} = " * "$(factor);" * L" T = " * "$(T);"* " re-train", w = 1.8,color="blue",linestyle=:dot)
+    factor,T= convergence_factor_106!(vu)
+    factor_text = "$(factor_text) vu=$(factor)"
+    plot!(vu_t[1:iterations]./(blocks*sec),vu[1:iterations],label=L"\rho_{VU} = " * "$(factor);" * L" T = " * "$(T)", w = 1.8,color="red")
+    factor,T  = convergence_factor_106!(vu_r)
+    factor_text = "$(factor_text) vu_r=$(factor)"
+    plot!(vu_r_t[1:iterations]./(blocks*sec),vu_r[1:iterations],label=L"\rho_{VU} = " * "$(factor);" * L" T = " * "$(T);" * " re-train", w = 1.8,color="red",linestyle=:dot)
+
+    yaxis!("relative residual norm", :log10)
+    ylims!((10^-7,10^-1))
+    xlims!((-(xlim ./ 90),xlim))
+    if (sec == 1000)
+        xlabel!("seconds per RHS")
+    else
+        xlabel!("milliseconds per RHS")
     end
+    savefig("../graphs/times/$(title)")
+    savefig("../graphs/times/$(title).eps")
 end
+
+function retrain_unet_vs_vcycle_graph_times_details!(title, vu, v, ju, vu_r, v_r, ju_r, vu_t, v_t, ju_t, vu_r_t, v_r_t, ju_r_t; xlim=20, sec=1, blocks=10)
+    iterations = length(vu)
+    iter = range(1, length=iterations)
+    fonts = Dict(:guidefont=>bfont, :xtickfont=>bfont, :ytickfont=>bfont, :legendfont=>sfont)
+
+    factor,T = convergence_factor_106!(v_r)
+    t = T
+    if T == 1001
+        T = 1018
+        t = 1000
+    end
+    factor_text = "v=$(factor)"
+    p = plot(v_r_t[1:iterations]./(blocks*sec),v_r[1:iterations],label=L"\rho_V = " * "$(factor);" * L" T = " * "$(T); $(v_r_t[t]./(blocks*sec))",legend=:topright, w = 1.8,color="green",size=(500,400); fonts...)
+    factor,T = convergence_factor_106!(ju)
+    factor_text = "$(factor_text) ju=$(factor)"
+    plot!(ju_t[1:iterations]./(blocks*sec),ju[1:iterations],label=L"\rho_{JU} = " * "$(factor);" * L" T = " * "$(T); $(ju_t[T]./(blocks*sec))", w = 1.8,color="blue")
+    factor,T = convergence_factor_106!(ju_r)
+    factor_text = "$(factor_text) ju_r=$(factor)"
+    plot!(ju_r_t[1:iterations]./(blocks*sec),ju_r[1:iterations],label=L"\rho_{JU} = " * "$(factor);" * L" T = " * "$(T); $(ju_r_t[T]./(blocks*sec));"* " re-train", w = 1.8,color="blue",linestyle=:dot)
+    factor,T= convergence_factor_106!(vu)
+    factor_text = "$(factor_text) vu=$(factor)"
+    plot!(vu_t[1:iterations]./(blocks*sec),vu[1:iterations],label=L"\rho_{VU} = " * "$(factor);" * L" T = " * "$(T); $(vu_t[T]./(blocks*sec))", w = 1.8,color="red")
+    factor,T  = convergence_factor_106!(vu_r)
+    factor_text = "$(factor_text) vu_r=$(factor)"
+    plot!(vu_r_t[1:iterations]./(blocks*sec),vu_r[1:iterations],label=L"\rho_{VU} = " * "$(factor);" * L" T = " * "$(T); $(vu_r_t[T]./(blocks*sec));" * " re-train", w = 1.8,color="red",linestyle=:dot)
+
+    yaxis!("relative residual norm", :log10)
+    ylims!((10^-7,10^-1))
+    xlims!((-(xlim ./ 90),xlim))
+    if (sec == 1000)
+        xlabel!("seconds per RHS")
+    else
+        xlabel!("milliseconds per RHS")
+    end
+    savefig("../graphs/$(title)")
+    savefig("../graphs/$(title).eps")
+end
+
+function unet_vs_vcycle_graph_iterations!(title, vu, v, ju; after_vcycle=false, e_vcycle_input=false, len=60, v_factor=0.92)
+    iterations = len # length(vu)
+    iter = range(1, length=iterations)
+    fonts = Dict(:guidefont=>bfont, :xtickfont=>bfont, :ytickfont=>bfont, :legendfont=>sfont)
+
+    factor,_ = convergence_factor_106!(v)
+    factor_text = "v=$(factor)"
+    p = plot(iter,v[1:iterations],label=L"\rho_V = " * "$(factor)",legend=:topright, w = 1.8,color="green",size=(500,400); fonts...)
+    factor,_ = convergence_factor_106!(ju)
+    factor_text = "$(factor_text) ju=$(factor)"
+    plot!(iter,ju[1:iterations],label=L"\rho_{JU} = " * "$(factor)", w = 1.8,color="blue")
+    factor,_ = convergence_factor_106!(vu)
+    factor_text = "$(factor_text) vu=$(factor)"
+    plot!(iter,vu[1:iterations],label=L"\rho_{VU} = " * "$(factor)", w = 1.8,color="red")
+
+    yaxis!("relative residual norm", :log10)
+    ylims!((10^-7,10^-1))
+    xlabel!("iterations")
+    savefig("../graphs/$(title)")
+end
+
+function retrain_unet_vs_vcycle_graph_iterations!(title, vu, v, ju, vu_r, v_r, ju_r; xlim=100)
+    iterations = length(vu)
+    iter = range(1, length=iterations)
+    fonts = Dict(:guidefont=>bfont, :xtickfont=>bfont, :ytickfont=>bfont, :legendfont=>sfont)
+
+    factor,_ = convergence_factor_106!(v_r)
+    factor_text = "v=$(factor)"
+    p = plot(iter,v_r[1:iterations],label=L"\rho_V = " * "$(factor)",legend=:topright, w = 1.8,color="green",size=(500,400); fonts...)
+    factor,_ = convergence_factor_106!(ju)
+    factor_text = "$(factor_text) ju=$(factor)"
+    plot!(iter,ju[1:iterations],label=L"\rho_{JU} = " * "$(factor)", w = 1.8,color="blue")
+    factor,_ = convergence_factor_106!(ju_r)
+    factor_text = "$(factor_text) ju_r=$(factor)"
+    plot!(iter,ju_r[1:iterations],label=L"\rho_{JU} = " * "$(factor);" * " re-train", w = 1.8,color="blue",linestyle=:dot)
+    factor,_ = convergence_factor_106!(vu)
+    factor_text = "$(factor_text) vu=$(factor)"
+    plot!(iter,vu[1:iterations],label=L"\rho_{VU} = " * "$(factor)", w = 1.8,color="red")
+    factor,_  = convergence_factor_106!(vu_r)
+    factor_text = "$(factor_text) vu_r=$(factor)"
+    plot!(iter,vu_r[1:iterations],label=L"\rho_{VU} = " * "$(factor);" * " re-train", w = 1.8,color="red",linestyle=:dot)
+
+    yaxis!("relative residual norm", :log10)
+    ylims!((10^-10,10^-1))
+    xlims!((-(xlim ./ 90),xlim))
+    xlabel!("iterations")
+    savefig("../graphs/$(title)")
+    savefig("../graphs/$(title).eps")
+end
+
+n = 512
+blocks = 10
+path = ""
+df = DataFrame(CSV.File(path))
+df_r= DataFrame(CSV.File(path))
+
+title = "23_48_23_64_cpu_block10_model4_$(n)_3090"
+retrain_unet_vs_vcycle_graph_iterations!(title, df.VU, df.V, df.JU, df_r.VU, df_r.V, df_r.JU; xlim=400)
+
+# df = (df1.+df2.+df3.+df4.+df5.+df6.+df7.+df8.+df9.+df10)./10
+# df_r = (df_r1.+df_r2.+df_r3.+df_r4.+df_r5.+df_r6.+df_r7.+df_r8.+df_r9.+df_r10)./10
+title = "23_48_23_32_gpu_model4_$(n)_b$(blocks)_retrain_times_mean10_details"
+retrain_unet_vs_vcycle_graph_times!(title, df.VU, df.V, df.JU, df_r.VU, df_r.V, df_r.JU, df.VU_T, df.V_T, df.JU_T, df_r.VU_T, df_r.V_T, df_r.JU_T; xlim=1000, sec=1, blocks=blocks)
+retrain_unet_vs_vcycle_graph_times_details!(title, df.VU, df.V, df.JU, df_r.VU, df_r.V, df_r.JU, df.VU_T, df.V_T, df.JU_T, df_r.VU_T, df_r.V_T, df_r.JU_T; xlim=8, sec=1000, blocks=blocks)
+
+blues = palette(:Blues_5)
+greens = palette(:Greens_5)
+reds = palette(:Reds_5)
+function gpu_cpu_32_64_bit_unet_vs_vcycle_graph_times!(title, vu32c, v32c, ju32c, vu32g, v32g, ju32g, vu64c, v64c, ju64c,
+    vu32c_t, v32c_t, ju32c_t, vu32g_t, v32g_t, ju32g_t, vu64c_t, v64c_t, ju64c_t; after_vcycle=false, e_vcycle_input=false, len=60, v_factor=0.92)
+    iterations = len # length(vu)
+    iter = range(1, length=iterations)
+    fonts = Dict(:guidefont=>bfont, :xtickfont=>bfont, :ytickfont=>bfont, :legendfont=>sfont)
+
+    p = plot(v64c_t[1:iterations]./1000,v64c[1:iterations],label=L"\rho_V"*" 64 BIT CPU",legend=:topright, w = 1,color=greens[2],size=(800,400), marker=(:circle,5); fonts...)
+    plot!(v32c_t[1:iterations]./1000,v32c[1:iterations],label=L"\rho_V"*" 32 BIT CPU",legend=:topright, w = 1.8,color=greens[3])
+    plot!(v32g_t[1:iterations]./1000,v32g[1:iterations],label=L"\rho_V"*" 32 BIT GPU",legend=:topright, w = 1.8,color=greens[4])
+    # plot!(v64g_t[1:iterations]./1000,v64g[1:iterations],label=L"\rho_V"*" 64 BIT GPU",legend=:topright, w = 1.8,color=greens[5])
+    plot!(ju64c_t[1:iterations]./1000,ju64c[1:iterations],label=L"\rho_{JU}"*" 64 BIT CPU",legend=:topright, w = 1.8,color=blues[2])
+    plot!(ju32c_t[1:iterations]./1000,ju32c[1:iterations],label=L"\rho_{JU}"*" 32 BIT CPU",legend=:topright, w = 1.8,color=blues[3])
+    plot!(ju32g_t[1:iterations]./1000,ju32g[1:iterations],label=L"\rho_{JU}"*" 32 BIT GPU",legend=:topright, w = 1.8,color=blues[4])
+    # plot!(ju64g_t[1:iterations]./1000,ju64g[1:iterations],label=L"\rho_{JU}"*" 64 BIT GPU",legend=:topright, w = 1.8,color=blues[5])
+    plot!(vu64c_t[1:iterations]./1000,vu64c[1:iterations],label=L"\rho_{VU}"*" 64 BIT CPU",legend=:topright, w = 1.8,color=reds[2])
+    plot!(vu32c_t[1:iterations]./1000,vu32c[1:iterations],label=L"\rho_{VU}"*" 32 BIT CPU",legend=:topright, w = 1.8,color=reds[3])
+    plot!(vu32g_t[1:iterations]./1000,vu32g[1:iterations],label=L"\rho_{VU}"*" 32 BIT GPU",legend=:topright, w = 1.8,color=reds[4])
+    # plot!(vu64g_t[1:iterations]./1000,vu64g[1:iterations],label=L"\rho_{VU}"*" 64 BIT GPU",legend=:topright, w = 1.8,color=reds[5])
+    yaxis!("relative residual norm", :log10)
+    ylims!((10^-7,10^-1))
+    xlabel!("seconds")
+    xlabel!("iterations")
+    savefig("../graphs/$(title)")
+end
+
+function gpu_cpu_32_64_bit_unet_vs_vcycle_graph_iterations!(title, vu32c, v32c, ju32c, vu32g, v32g, ju32g, vu64c, v64c, ju64c, vu64g, v64g, ju64g; after_vcycle=false, e_vcycle_input=false, len=60, v_factor=0.92)
+    iterations = len # length(vu)
+    iter = range(1, length=iterations)
+    fonts = Dict(:guidefont=>bfont, :xtickfont=>bfont, :ytickfont=>bfont, :legendfont=>sfont)
+
+    p = plot(iter,v32c[1:iterations],label=L"\rho_V"*" 32 BIT CPU",legend=:topright, w = 1.8,color=greens[2],size=(700,700); fonts...)
+    plot!(iter,v32g[1:iterations],label=L"\rho_V"*" 32 BIT GPU",legend=:topright, w = 1.8,color=greens[3])
+    plot!(iter,v64c[1:iterations],label=L"\rho_V"*" 64 BIT CPU",legend=:topright, w = 1.8,color=greens[4])
+    # plot!(iter,v64g[1:iterations],label=L"\rho_V"*" 64 BIT GPU",legend=:topright, w = 1.8,color=greens[5])
+    plot!(iter,ju32c[1:iterations],label=L"\rho_{JU}"*" 32 BIT CPU",legend=:topright, w = 1.8,color=blues[2])
+    plot!(iter,ju32g[1:iterations],label=L"\rho_{JU}"*" 32 BIT GPU",legend=:topright, w = 1.8,color=blues[3])
+    plot!(iter,ju64c[1:iterations],label=L"\rho_{JU}"*" 64 BIT CPU",legend=:topright, w = 1.8,color=blues[4])
+    # plot!(iter,ju64g[1:iterations],label=L"\rho_{JU}"*" 64 BIT GPU",legend=:topright, w = 1.8,color=blues[5])
+    plot!(iter,vu32c[1:iterations],label=L"\rho_{VU}"*" 32 BIT CPU",legend=:topright, w = 1.8,color=reds[2])
+    plot!(iter,vu32g[1:iterations],label=L"\rho_{VU}"*" 32 BIT GPU",legend=:topright, w = 1.8,color=reds[3])
+    plot!(iter,vu64c[1:iterations],label=L"\rho_{VU}"*" 64 BIT CPU",legend=:topright, w = 1.8,color=reds[4])
+    # plot!(iter,vu64g[1:iterations],label=L"\rho_{VU}"*" 64 BIT GPU",legend=:topright, w = 1.8,color=reds[5])
+    yaxis!("relative residual norm", :log10)
+    xlabel!("iterations")
+    savefig("../graphs/$(title)")
+end
+
+title = "23_48_23_32_64_cpu_gpu_iterations"
+
+path = ""
+c32_df = DataFrame(CSV.File(path))
+g32_df = DataFrame(CSV.File(path))
+c64_df = DataFrame(CSV.File(path))
+g64_df = DataFrame(CSV.File(path))
+
+gpu_cpu_32_64_bit_unet_vs_vcycle_graph_iterations!("$(title)",c32_df.VU, c32_df.V,c32_df.JU,g32_df.VU, g32_df.V,g32_df.JU,c64_df.VU, c64_df.V,c64_df.JU,g64_df.VU, g64_df.V,g64_df.JU;len=400)
+title = "23_48_23_32_64_cpu_gpu_times"
+iter = 800
+
+c32_df = DataFrame(CSV.File(path))
+g32_df = DataFrame(CSV.File(path))
+c64_df = DataFrame(CSV.File(path))
+
+gpu_cpu_32_64_bit_unet_vs_vcycle_graph_times!("$(title)",c32_df.VU, c32_df.V,c32_df.JU,g32_df.VU, g32_df.V,g32_df.JU,c64_df.VU, c64_df.V,c64_df.JU,
+c32_df.VU_T, c32_df.V_T,c32_df.JU_T,g32_df.VU_T, g32_df.V_T,g32_df.JU_T,c64_df.VU_T, c64_df.V_T,c64_df.JU_T;len=iter)
 
 function gmres_unet_vs_vcycle_graph!(title, gmres5vu, gmres5ju, gmres5v, gmres10vu, gmres10ju, gmres10v,gmres20vu, gmres20ju,gmres20v)
     iterations = length(gmres5v)
@@ -285,22 +426,17 @@ function gmres_unet_vs_vcycle_graph!(title, gmres5vu, gmres5ju, gmres5v, gmres10
     yaxis!("relative residual norm", :log10)
     ylims!((10^-10,10^-1))
     xlabel!("iterations")
-    savefig("C:/Siga/Repositories/HelmholtzAccCNN.jl/paper/gmres_blocks/$(title)")
-    savefig("C:/Siga/Repositories/HelmholtzAccCNN.jl/paper/gmres_blocks/$(title).eps")
+    savefig("../graphs/$(title)")
+    savefig("../graphs/$(title).eps")
 end
 
-gmres5_p = "C:/Siga/Repositories/HelmholtzAccCNN.jl/graphs/24.06/gmres/23_48_23_GMRES5 t_n=256 t_axb=t t_norm=f preconditioner test.csv"
-gmres10_p = "C:/Siga/Repositories/HelmholtzAccCNN.jl/graphs/24.06/gmres/23_48_23_GMRES10 t_n=256 t_axb=t t_norm=f preconditioner test.csv"
-gmres20_p= "C:/Siga/Repositories/HelmholtzAccCNN.jl/graphs/24.06/gmres/23_48_23_GMRES20 t_n=256 t_axb=t t_norm=f preconditioner test.csv"
-
 n = 256
-axb = false
+title = "23_48_23_10blocks_GMRES_$(n)"
 
-title = "23_48_23_GMRES_$(n)"
-
-gmres5 = DataFrame(CSV.File(gmres5_p))
-gmres10 = DataFrame(CSV.File(gmres10_p))
-gmres20 = DataFrame(CSV.File(gmres20_p))
+path = ""
+gmres5 = DataFrame(CSV.File(path))
+gmres10 = DataFrame(CSV.File(path))
+gmres20 = DataFrame(CSV.File(path))
 
 gmres_unet_vs_vcycle_graph!("$(title)", gmres5.VU, gmres5.JU, gmres5.V, gmres10.VU, gmres10.JU, gmres10.V, gmres20.VU, gmres20.JU, gmres20.V)
 
@@ -325,50 +461,17 @@ function blocks_unet_vs_vcycle_graph!(title, blocks2vu, blocks2ju, blocks2v, blo
     yaxis!("relative residual norm", :log10)
     ylims!((10^-10,10^-1))
     xlabel!("iterations")
-    savefig("C:/Siga/Repositories/HelmholtzAccCNN.jl/paper/gmres_blocks/$(title)")
-    savefig("C:/Siga/Repositories/HelmholtzAccCNN.jl/paper/gmres_blocks/$(title).eps")
+    savefig("../graphs/$(title)")
+    savefig("../graphs/$(title).eps")
 end
-
-blocks2_p = "C:/Siga/Repositories/HelmholtzAccCNN.jl/graphs/24.06/gmres/23_48_23_2b t_n=256 t_axb=f t_norm=f preconditioner test.csv"
-blocks5_p = "C:/Siga/Repositories/HelmholtzAccCNN.jl/graphs/24.06/gmres/23_48_23_5b t_n=256 t_axb=f t_norm=f preconditioner test.csv"
-blocks10_p = "C:/Siga/Repositories/HelmholtzAccCNN.jl/graphs/24.06/gmres/23_48_23_10b t_n=256 t_axb=f t_norm=f preconditioner test.csv"
-blocks20_p = "C:/Siga/Repositories/HelmholtzAccCNN.jl/graphs/24.06/gmres/23_48_23_20b t_n=256 t_axb=f t_norm=f preconditioner test.csv"
 
 n = 256
-axb = false
-
 title = "23_48_23_blocks_$(n)"
 
-blocks2 = DataFrame(CSV.File(blocks2_p))
-blocks5 = DataFrame(CSV.File(blocks5_p))
-blocks10 = DataFrame(CSV.File(blocks10_p))
-blocks20 = DataFrame(CSV.File(blocks20_p))
+path = ""
+blocks2 = DataFrame(CSV.File(path))
+blocks5 = DataFrame(CSV.File(path))
+blocks10 = DataFrame(CSV.File(path))
+blocks20 = DataFrame(CSV.File(path))
 
 blocks_unet_vs_vcycle_graph!("$(title)", blocks2.VU, blocks2.JU, blocks2.V, blocks5.VU, blocks5.JU, blocks5.V, blocks10.VU, blocks10.JU, blocks10.V, blocks20.VU, blocks20.JU, blocks20.V)
-
-function multi_error_vs_residual_graph!(title, evu, rvu, eu, ru, eju, rju, ev, rv; after_vcycle=false, e_vcycle_input=false)
-    iterations = length(eu)
-    iter = range(1, length=iterations)
-    fonts = Dict(:guidefont=>bfont, :xtickfont=>bfont, :ytickfont=>bfont, :legendfont=>bfont)
-    # Vcycle
-    p = plot(iter,ev[1:iterations],label=L"e_v",legend=:bottomleft,color="green",size=(500,400); fonts...)
-    # plot!(iter,rv[1:iterations],label=L"r_v",color="green",linestyle=:dot)
-    plot!(iter,eu[1:iterations],label=L"e_u",color="red")
-    # plot!(iter,ru[1:iterations],label=L"r_u",color="red",linestyle=:dot)
-    plot!(iter,eju[1:iterations],label=L"e_{ju}",color="orange")
-    # plot!(iter,rju[1:iterations],label=L"r_{ju}",color="orange",linestyle=:dot)
-    plot!(iter,evu[1:iterations],label=L"e_{vu}",color="blue")
-    # plot!(iter,rvu[1:iterations],label=L"r_{vu}",color="blue",linestyle=:dot)
-
-    yaxis!(L"\Vert b - Hx \Vert_2", :log10)
-    xlabel!("iterations")
-
-    savefig("C:/Siga/Repositories/HelmholtzAccCNN.jl/paper/$(title)")
-end
-
-pathu = "C:/Siga/Repositories/HelmholtzAccCNN.jl/graphs/16.06/18_13_51 RADAM ND FFSDNUnet FFKappa SResidualBlock 10 elu 3 5 g=-1 t=Float32 g=t e=f r=f k=1 25 n=128 f=10_0 m=20000 bs=20 lr=0_0001 each=32 i=80 t_n=128 t_axb=f t_norm=f unet error.csv"
-pathv = "C:/Siga/Repositories/HelmholtzAccCNN.jl/graphs/16.06/18_13_51 RADAM ND FFSDNUnet FFKappa SResidualBlock 10 elu 3 5 g=-1 t=Float32 g=t e=f r=f k=1 25 n=128 f=10_0 m=20000 bs=20 lr=0_0001 each=32 i=80 t_n=128 t_axb=f t_norm=f vcycle error.csv"
-title = "18_13_51 RADAM ND FFSDNUnet FFKappa SResidualBlock 1 25 error"
-dfu = DataFrame(CSV.File(pathu))
-dfv = DataFrame(CSV.File(pathv))
-multi_error_vs_residual_graph!(title, dfu.EA[1:20], dfu.RA[1:20], dfu.EA[21:40], dfu.RA[21:40], dfu.EA[41:60], dfu.RA[41:60], dfv.EA[21:40], dfv.RA[21:40])
