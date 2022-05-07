@@ -74,7 +74,7 @@ loss_error_residual_to_graph!(title, path)
 function csv_to_heatmap!(title, path, n, m)
     df = DataFrame(CSV.File(path))
     heatmap(reshape(df.K, n-1, m-1), color=:jet,size=(200*m/n,200))
-    savefig("C:/Siga/Repositories/HelmholtzAccCNN.jl/temp/graphs/$(title)")
+    savefig("../graphs/$(title)")
 end
 
 path = ""

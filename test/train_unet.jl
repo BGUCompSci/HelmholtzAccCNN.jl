@@ -22,8 +22,8 @@ else
 end
 
 pu = cpu # gpu
-r_type = Float32
-c_type = ComplexF32
+r_type = Float64
+c_type = ComplexF64
 u_type = Float32
 gmres_type = ComplexF64
 a_type = CuArray{gmres_type}
@@ -53,7 +53,6 @@ function test_train_unet!(n, f, opt, init_lr, train_size, test_size, batch_size,
     gamma = r_type.(absorbing_layer!(gamma, pad_cells, omega))|>pu
     test_name = replace("$(Dates.format(now(), "HH_MM_SS")) RADAM ND $(model_type) $(k_type) $(resnet_type) $(k_chs) $(σ) $(indexes) $(k_kernel) g=$(gmres_restrt) t=$(u_type) g=$("$(gamma_input)"[1]) e=$("$(e_vcycle_input)"[1]) r=$("$(residual_loss)"[1]) k=$(kappa_type) $(threshold) n=$(n) f=$(f) m=$(train_size) bs=$(batch_size) lr=$(init_lr) each=$(smaller_lr) i=$(iterations)","."=>"_")
     model = create_model!(e_vcycle_input, kappa_input, gamma_input; kernel=kernel, type=model_type, k_type=k_type, resnet_type=resnet_type, k_chs=k_chs, indexes=indexes, σ=σ, arch=arch)|>cgpu
-
     model, train_loss, test_loss = train_residual_unet!(model, test_name, n, n, f, kappa, omega, gamma,
                                                         train_size, test_size, batch_size, iterations, init_lr;
                                                         e_vcycle_input=e_vcycle_input, v2_iter=v2_iter, level=level, data_augmentetion=data_augmentetion,
@@ -70,8 +69,9 @@ function test_train_unet!(n, f, opt, init_lr, train_size, test_size, batch_size,
 
     # New Example Check
 
-    (input,e_true) = generate_random_data!(1, n, kappa, omega, gamma; e_vcycle_input=e_vcycle_input, v2_iter=v2_iter, level=level,
+    (input,e_true) = generate_random_data!(1, n, n, kappa, omega, gamma; e_vcycle_input=e_vcycle_input, v2_iter=v2_iter, level=level,
                                                           kappa_type=kappa_type, threshold=threshold, kappa_input=kappa_input, kappa_smooth=kappa_smooth, axb=axb, norm_input=norm_input, gmres_restrt=gmres_restrt)[1]
+
     e_vcycle = input[:,:,1:2,:]
     r = input[:,:,end-1:end,:]
     if gamma_input == true
@@ -106,10 +106,10 @@ function test_train_unet!(n, f, opt, init_lr, train_size, test_size, batch_size,
         @info "$(Dates.format(now(), "HH:MM:SS")) - UNet train error norm = $(norm_diff!(model_result, e_true))"
     end
 
-    m = 10
+    dataset_size = 10
     restrt = 10
     max_iter = 6
-    check_model!(test_name, model, n, f, kappa, omega, gamma, e_vcycle_input, 4, kappa_input, gamma_input, kernel, m, restrt, max_iter; v2_iter=v2_iter, level=level, smooth=kappa_smooth, threshold=threshold, axb=axb, norm_input=norm_input, before_jacobi=false, indexes=indexes, arch=arch)
+    check_model!(test_name, model, n, n, f, kappa, omega, gamma, e_vcycle_input, 4, kappa_input, gamma_input, kernel, dataset_size, restrt, max_iter; v2_iter=v2_iter, level=level, smooth=kappa_smooth, threshold=threshold, axb=axb, norm_input=norm_input, before_jacobi=false, indexes=indexes, arch=arch)
 end
 
 init_lr = 0.0001

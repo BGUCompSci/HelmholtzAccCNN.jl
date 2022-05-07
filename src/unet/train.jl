@@ -240,6 +240,7 @@ function train_residual_unet!(model, test_name, n, m, f, kappa, omega, gamma,
                                                 kappa_type=kappa_type, threshold=threshold, kappa_input=kappa_input, kappa_smooth=kappa_smooth, k_kernel=k_kernel, axb=axb, jac=jac, norm_input=norm_input, gmres_restrt=gmres_restrt)
     end
     @info "$(Dates.format(now(), "HH:MM:SS")) - Generated Data"
+    mkpath("models")
 
     # if model == NaN
     #     model = create_model!(e_vcycle_input, kappa_input, gamma_input; kernel=kernel, type=model_type, k_type=k_type, k_chs=k_chs, indexes=indexes, σ=σ)|>cgpu

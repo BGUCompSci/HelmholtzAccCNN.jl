@@ -99,7 +99,7 @@ end
 function check_model_times!(test_name, model, n, m, f, kappa, omega, gamma, e_vcycle_input, kappa_type, kappa_input, gamma_input, kernel, dataset_size, restrt, max_iter; v2_iter=10, level=3, smooth=false, k_kernel=3, threshold=50, axb=false, norm_input=false, before_jacobi=false, log_error=false, unet_in_vcycle=false, indexes=3, arch=1) # arch - Standart (0) SplitUNet (1) FeaturesUNet (2)
     unet_results = zeros(dataset_size,6,restrt*max_iter+1)
     vcycle_results = zeros(dataset_size,4,restrt*max_iter+1)
-
+    mkpath("test/unet/results")
     for i=1:dataset_size
         x_true = randn(c_type,n-1,m-1, blocks, 1)|>pu
         kappa = r_type.(generate_kappa!(n, m; type=kappa_type, smooth=smooth, threshold=threshold, kernel=k_kernel)|>pu)
@@ -146,7 +146,7 @@ end
 function check_model!(test_name, model, n, m, f, kappa, omega, gamma, e_vcycle_input, kappa_type, kappa_input, gamma_input, kernel, dataset_size, restrt, max_iter; v2_iter=10, level=3, smooth=false, k_kernel=3, threshold=50, axb=false, norm_input=false, before_jacobi=false, log_error=false, unet_in_vcycle=false, indexes=3, arch=1) # arch - Standart (0) SplitUNet (1) FeaturesUNet (2)
     unet_results = zeros(dataset_size,3,restrt*max_iter+1)
     vcycle_results = zeros(dataset_size,2,restrt*max_iter+1)
-
+    mkpath("test/unet/results")
     for i=1:dataset_size
         x_true = randn(c_type,n-1,m-1, blocks, 1)|>pu
         kappa = r_type.(generate_kappa!(n, m; type=kappa_type, smooth=smooth, threshold=threshold, kernel=k_kernel)|>pu)
